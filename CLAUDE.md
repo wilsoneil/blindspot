@@ -5,10 +5,15 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 ## Current status
 
 - Phase 1A (hello-world page deployed from GitHub to Vercel): done
-- Phase 1 (Foundations, including login): done. Sign-in live; games imported (daily import scheduled); puzzle store built (141,430 puzzles, every label covered)
+- Phase 1 (Foundations, including login): done. Sign-in live; games imported (daily import scheduled); puzzle store built (155,285 puzzles, every label covered; labels reviewed against the full Lichess database)
 - Next: Phase 2 (Analysis)
 
 Update this section when a phase is finished.
+
+### Notes for later phases
+
+- **Phase 3, before training goes live:** a real puzzle build removes stored puzzles it no longer selects (`src/lib/puzzle-store.ts`). Change it to keep any puzzle that has attempts, and store the puzzle's rating with each attempt (Lichess ratings drift between updates; the Blindspot rating must use the rating at the time of the attempt).
+- **After that:** consider a quarterly automatic puzzle rebuild (a `schedule` in `.github/workflows/build-puzzles.yml`, like the daily import), to pick up Lichess's monthly updates.
 
 ## How to work
 
