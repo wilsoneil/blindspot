@@ -20,17 +20,17 @@ You only do this once. Never paste keys into code, chat or commits: they go only
 ### 1. Create the database (Supabase)
 
 1. Sign up at [supabase.com](https://supabase.com) (free plan) and create a new project. Pick a region near you (e.g. London) and save the database password in your password manager.
-2. Open **SQL Editor** → **New query**, paste the whole of `supabase/migrations/0001_init.sql`, and press **Run**. You should see "Success. No rows returned".
+2. Open **SQL Editor** → **New query**, paste the whole of `supabase/migrations/0001_init.sql`, and press **Run**. You should see "Success. No rows returned". Do the same with `0002_grant_service_role.sql` (and any later numbered files, in order).
 3. Open **Project Settings** → **API** (or **API Keys**) and find:
    - the **Project URL** (looks like `https://abcd1234.supabase.co`)
-   - the **service_role** secret key (click to reveal). This key can read and change everything: treat it like a password.
+   - the **Secret key** (starts `sb_secret_`), or the legacy **service_role** key. This key can read and change everything: treat it like a password. Not the publishable / anon key.
 
 ### 2. Tell Vercel about the database
 
 1. In Vercel, open the blindspot project → **Settings** → **Environment Variables**, and add:
    - `SUPABASE_URL` = the Project URL
    - `SUPABASE_SERVICE_ROLE_KEY` = the service_role key (tick **Sensitive**)
-2. In **Settings** → **Build and Deployment**, check **Framework Preset** says **Next.js** (it was "Other" for the old hello-world page).
+2. Vercel knows this is a Next.js app from `vercel.json`, so no build settings need changing.
 3. Redeploy (Deployments → ⋯ → Redeploy). The home page should now show "Foundations" instead of "Connect the database".
 
 ### 3. Tell GitHub about the database (for the import and puzzle jobs)

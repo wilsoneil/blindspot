@@ -9,8 +9,9 @@ export function SetupNotice({ ctx }: { ctx: Exclude<AppContext, { status: "ready
         <p>The settings are in place but the database answered with an error:</p>
         <p className="small"><code>{ctx.message}</code></p>
         <p className="small muted">
-          Most likely the tables haven&apos;t been created yet: run <code>supabase/migrations/0001_init.sql</code> in
-          the Supabase SQL Editor. Otherwise check the two environment variables in Vercel.
+          Run every file in <code>supabase/migrations/</code> in order in the Supabase SQL Editor (&quot;permission
+          denied&quot; usually means one was missed). Otherwise check the two environment variables in Vercel, and
+          that the key is the secret (service_role) key, not the publishable one.
         </p>
       </section>
     );
