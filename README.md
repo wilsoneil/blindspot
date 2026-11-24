@@ -59,7 +59,7 @@ While you're in Settings, open **Advanced Security** (or **Code security**) and 
 ### 5. First run
 
 1. On the live site, open **Settings**, enter your chess.com username and save.
-2. In GitHub → **Actions** → **Import games** → **Run workflow**. It takes a few minutes; the log shows counts only.
+2. In GitHub → **Actions** → **Import games** → **Run workflow**. It takes a few minutes; the log shows counts only. After that it runs by itself every morning.
 3. In GitHub → **Actions** → **Build puzzle store** → **Run workflow** with **dry run** ticked. Check the per-label counts in the log (none should say "none found"), then run it again with dry run unticked to save the puzzles.
 4. Refresh the home page: the Foundations panel shows your games, puzzles and ratings.
 

@@ -1,12 +1,13 @@
 # Imports new chess.com games and today's ratings into Supabase.
-# For now it runs when started by hand: Actions tab -> "Import games" -> "Run workflow".
-# Phase 4 switches on the daily schedule (the commented-out lines below).
+# Runs every morning by itself, and can also be started by hand:
+# Actions tab -> "Import games" -> "Run workflow".
+# Running daily also keeps the free Supabase project from pausing after a quiet week.
 name: Import games
 
 on:
   workflow_dispatch:
-  # schedule:
-  #   - cron: "17 5 * * *"   # every day at 05:17 UTC
+  schedule:
+    - cron: "17 5 * * *"   # every day at 05:17 UTC (just after 5am UK time in winter)
 
 permissions:
   contents: read
@@ -16,8 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm

@@ -8,12 +8,11 @@
 // Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY unless --dry-run.
 
 import { createReadStream } from "node:fs";
-import { createInterface } from "node:readline";
 import { Readable } from "node:stream";
-import { createZstdDecompress } from "node:zlib";
-import type { ReadableStream as WebReadableStream } from "node:stream/web";
+import type { ReadableStream as NodeWebStream } from "node:stream/web";
 import { requireDb, type Db } from "../src/lib/db";
 import { LABELS } from "../src/lib/labels";
+import { readLines } from "../src/lib/lines";
 import { parsePuzzleLine, PuzzleFilter, type PuzzleRow } from "../src/lib/puzzles";
 
 try { process.loadEnvFile(".env.local"); } catch { /* no local file: use the real environment */ }
@@ -25,20 +24,14 @@ const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const fileArg = args.includes("--file") ? args[args.indexOf("--file") + 1] : null;
 
-async function openSource(): Promise<NodeJS.ReadableStream> {
-  let raw: NodeJS.ReadableStream;
-  let compressed: boolean;
-  if (fileArg) {
-    raw = createReadStream(fileArg);
-    compressed = fileArg.endsWith(".zst");
-  } else {
-    console.log("Downloading the Lichess puzzle database...");
-    const res = await fetch(LICHESS_URL);
-    if (!res.ok || !res.body) throw new Error(`Lichess download failed: ${res.status}`);
-    raw = Readable.fromWeb(res.body as unknown as WebReadableStream);
-    compressed = true;
-  }
-  return compressed ? raw.pipe(createZstdDecompress()) : raw;
+/** The raw file, from disk or straight from Lichess. readLines unpacks it if needed. */
+async function openSource(): Promise<AsyncIterable<Uint8Array>> {
+  if (fileArg) return createReadStream(fileArg);
+  console.log("Downloading the Lichess puzzle database...");
+  const res = await fetch(LICHESS_URL);
+  if (!res.ok || !res.body) throw new Error(`Lichess download failed: ${res.status}`);
+  console.log(`  content type: ${res.headers.get("content-type")}, encoding: ${res.headers.get("content-encoding") ?? "none"}`);
+  return Readable.fromWeb(res.body as unknown as NodeWebStream<Uint8Array>);
 }
 
 async function save(db: Db, rows: PuzzleRow[]) {
@@ -52,8 +45,9 @@ async function main() {
   let batch: PuzzleRow[] = [];
   const started = Date.now();
 
-  const lines = createInterface({ input: await openSource(), crlfDelay: Infinity });
-  for await (const line of lines) {
+  let lines = 0;
+  for await (const line of readLines(await openSource())) {
+    lines++;
     const puzzle = parsePuzzleLine(line);
     if (!puzzle || !filter.accept(puzzle)) {
       if (filter.isFull()) break;
@@ -70,6 +64,11 @@ async function main() {
   }
   if (db && batch.length) await save(db, batch);
 
+  // A real run reads millions of lines. Almost none means the download wasn't the puzzle file.
+  if (filter.seen < 1000) {
+    throw new Error(`Only ${lines} lines and ${filter.seen} puzzles read: the file doesn't look like the Lichess puzzle database.`);
+  }
+
   console.log(`\nDone in ${Math.round((Date.now() - started) / 1000)}s: ${filter.seen.toLocaleString()} read, ${filter.kept.toLocaleString()} kept${dryRun ? " (dry run, nothing saved)" : ""}.`);
   console.log("Puzzles per label:");
   for (const label of LABELS) {
@@ -77,6 +76,7 @@ async function main() {
     const n = filter.perLabel.get(label.id) ?? 0;
     console.log(`  ${label.name.padEnd(30)} ${n.toLocaleString().padStart(8)}${n === 0 ? "   <- none found: check the theme name" : ""}`);
   }
+  process.exit(0); // the download may still be open if we stopped early at the total cap
 }
 
 main().catch((e) => {
