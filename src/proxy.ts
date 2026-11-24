@@ -45,6 +45,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Every path except Next.js's own files and the icon.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Every path except Next.js's own files, the favicon, and the app manifest and icons.
+  // Browsers fetch the manifest and icons without the login cookie, so they must not be
+  // redirected to /login. They contain nothing personal.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/).*)"],
 };
