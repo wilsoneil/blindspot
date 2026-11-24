@@ -1,0 +1,235 @@
+/* Base styles. Colours always come from the theme variables (src/lib/themes). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+}
+
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 1rem; }
+
+p { margin: 0 0 0.75rem; }
+
+.muted { color: var(--muted); }
+.small { font-size: 0.875rem; }
+
+/* Layout: phone first, a single readable column on larger screens */
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1rem 16px 3rem;
+}
+
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-inner {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0.75rem 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.nav a:hover { color: var(--text); }
+
+/* Cards */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.card.notice { border-color: var(--accent); }
+.card.problem { border-color: var(--bad); }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.stat {
+  background: var(--surface-alt);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.stat-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.pill {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.check { color: var(--good); }
+.cross { color: var(--bad); }
+
+ol.steps { padding-left: 1.25rem; margin: 0; }
+ol.steps li { margin-bottom: 0.4rem; }
+
+/* Forms */
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 0.75rem 1rem 1rem;
+  margin: 0 0 1rem;
+  min-width: 0;
+}
+
+legend {
+  font-weight: 700;
+  padding: 0 0.35rem;
+}
+
+.field { margin-top: 0.85rem; }
+.field > label,
+.field > .label { display: block; font-weight: 500; margin-bottom: 0.25rem; }
+.hint { color: var(--muted); font-size: 0.8rem; margin-top: 0.2rem; }
+
+input[type="text"],
+input[type="number"],
+select {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+input[type="checkbox"],
+input[type="radio"] { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; }
+
+.toggle { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
+
+.button {
+  display: inline-block;
+  padding: 0.65rem 1.2rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.button:disabled { opacity: 0.6; cursor: default; }
+
+.save-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  background: var(--bg);
+}
+
+.message-ok { color: var(--good); }
+.message-error { color: var(--bad); }
+
+/* Theme picker */
+.theme-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.theme-option {
+  display: block;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem;
+  cursor: pointer;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.theme-option:has(input:checked) { border-color: var(--accent); }
+.theme-option input { position: absolute; opacity: 0; pointer-events: none; }
+
+.mini-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.35rem;
+}
+
+.coming {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 400;
+}
