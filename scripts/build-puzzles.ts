@@ -15,7 +15,7 @@ import type { ReadableStream as NodeWebStream } from "node:stream/web";
 import { requireDb, type Db } from "../src/lib/db";
 import { LABELS } from "../src/lib/labels";
 import { readLines } from "../src/lib/lines";
-import { parsePuzzleLine, PuzzleFilter, type PuzzleRow } from "../src/lib/puzzles";
+import { FilterReport, parsePuzzleLine, PuzzleFilter, type Decision, type PuzzleRow } from "../src/lib/puzzles";
 
 try { process.loadEnvFile(".env.local"); } catch { /* no local file: use the real environment */ }
 
@@ -45,6 +45,7 @@ async function save(db: Db, rows: PuzzleRow[]) {
 async function main() {
   const db = dryRun ? null : requireDb();
   const filter = new PuzzleFilter();
+  const report = new FilterReport();
   let batch: PuzzleRow[] = [];
   const started = Date.now();
 
@@ -54,14 +55,17 @@ async function main() {
     const puzzle = parsePuzzleLine(line);
     // Keep reading to the end even once the store is full, so a program feeding
     // this script through a pipe isn't cut off mid-file (which would look like a failure).
-    if (!puzzle || !filter.accept(puzzle)) continue;
+    if (!puzzle) continue;
+    const decision = filter.decide(puzzle);
+    report.record(puzzle, decision);
+    if (filter.seen % 1_000_000 === 0) {
+      console.log(`  ${filter.seen.toLocaleString()} read, ${filter.kept.toLocaleString()} kept`);
+    }
+    if (decision !== "kept") continue;
     batch.push(puzzle);
     if (batch.length >= BATCH) {
       if (db) await save(db, batch);
       batch = [];
-    }
-    if (filter.seen % 500_000 === 0) {
-      console.log(`  ${filter.seen.toLocaleString()} read, ${filter.kept.toLocaleString()} kept`);
     }
   }
   if (db && batch.length) await save(db, batch);
@@ -78,9 +82,41 @@ async function main() {
     const n = filter.perLabel.get(label.id) ?? 0;
     console.log(`  ${label.name.padEnd(30)} ${n.toLocaleString().padStart(8)}${n === 0 ? "   <- none found: check the theme name" : ""}`);
   }
+  printReport(filter, report);
 }
 
 main().catch((e) => {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
 });
+
+const DECISION_TEXT: Record<Decision, string> = {
+  kept: "Kept",
+  lowPopularity: "Dropped: popularity under the minimum",
+  fewPlays: "Dropped: too few plays",
+  unsettledRating: "Dropped: rating not settled yet",
+  noLabel: "Dropped: no theme maps to a label",
+  phaseOnly: "Dropped: only a game-phase theme",
+  bandFull: "Dropped: its labels were full at that rating",
+  storeFull: "Dropped: store already full",
+};
+
+function printReport(filter: PuzzleFilter, report: FilterReport) {
+  const n = (x: number) => x.toLocaleString().padStart(10);
+  const pct = (x: number) => `${((100 * x) / filter.seen).toFixed(1).padStart(5)}%`;
+
+  console.log("\nWhat happened to each puzzle:");
+  for (const [decision, text] of Object.entries(DECISION_TEXT) as [Decision, string][]) {
+    const count = filter.decisions.get(decision) ?? 0;
+    console.log(`  ${text.padEnd(46)} ${n(count)}  ${pct(count)}`);
+  }
+
+  console.log("\nThemes on good-quality puzzles dropped for having no usable label (top 25):");
+  for (const [theme, count] of report.topUnusedThemes()) console.log(`  ${theme.padEnd(30)} ${n(count)}`);
+
+  console.log("\nCandidate labels (good-quality puzzles only; same 250-per-band cap):");
+  console.log(`  ${"Candidate".padEnd(34)} ${"with theme".padStart(10)} ${"left out".padStart(10)} ${"would add".padStart(10)}`);
+  for (const [name, c] of report.candidates) {
+    console.log(`  ${name.padEnd(34)} ${n(c.goodQuality)} ${n(c.leftOut)} ${n(c.wouldAdd)}`);
+  }
+}
