@@ -3,6 +3,8 @@
 //   npm run build:puzzles                         download from Lichess and save to the database
 //   npm run build:puzzles -- --dry-run            download and report counts, save nothing
 //   npm run build:puzzles -- --file path.csv.zst  use a local copy (.csv or .csv.zst)
+//   zstd -dc file.csv.zst | npm run build:puzzles -- --file -   read the CSV from a pipe
+//                                                   (what the GitHub workflow does)
 //
 // The ~900 MB file is streamed and filtered line by line; it is never stored in full.
 // Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY unless --dry-run.
@@ -26,6 +28,7 @@ const fileArg = args.includes("--file") ? args[args.indexOf("--file") + 1] : nul
 
 /** The raw file, from disk or straight from Lichess. readLines unpacks it if needed. */
 async function openSource(): Promise<AsyncIterable<Uint8Array>> {
+  if (fileArg === "-") return process.stdin;
   if (fileArg) return createReadStream(fileArg);
   console.log("Downloading the Lichess puzzle database...");
   const res = await fetch(LICHESS_URL);
@@ -49,10 +52,9 @@ async function main() {
   for await (const line of readLines(await openSource())) {
     lines++;
     const puzzle = parsePuzzleLine(line);
-    if (!puzzle || !filter.accept(puzzle)) {
-      if (filter.isFull()) break;
-      continue;
-    }
+    // Keep reading to the end even once the store is full, so a program feeding
+    // this script through a pipe isn't cut off mid-file (which would look like a failure).
+    if (!puzzle || !filter.accept(puzzle)) continue;
     batch.push(puzzle);
     if (batch.length >= BATCH) {
       if (db) await save(db, batch);
@@ -76,7 +78,6 @@ async function main() {
     const n = filter.perLabel.get(label.id) ?? 0;
     console.log(`  ${label.name.padEnd(30)} ${n.toLocaleString().padStart(8)}${n === 0 ? "   <- none found: check the theme name" : ""}`);
   }
-  process.exit(0); // the download may still be open if we stopped early at the total cap
 }
 
 main().catch((e) => {
