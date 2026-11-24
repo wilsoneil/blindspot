@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LABELS, labelsForThemes } from "../src/lib/labels";
+import { LABELS, labelsForThemes, OWN_GAME_LABELS, QUALIFYING_LABELS } from "../src/lib/labels";
 import { FilterReport, parsePuzzleLine, PuzzleFilter } from "../src/lib/puzzles";
 
 // Made-up puzzle lines in the Lichess CSV format.
@@ -16,6 +16,19 @@ describe("labels", () => {
     expect(labelsForThemes(["fork", "mateIn2", "middlegame", "unknownTheme"]).sort())
       .toEqual(["fork", "phaseMiddlegame", "shortMate"]);
     expect(labelsForThemes(["discoveredCheck", "doubleCheck"])).toEqual(["discoveredOrDoubleCheck"]);
+  });
+
+  it("covers the labels added after the Nov 2026 filter report", () => {
+    expect(labelsForThemes(["kingsideAttack", "queensideAttack", "zugzwang", "equality"]).sort())
+      .toEqual(["defending", "kingsideAttack", "queensideAttack", "zugzwang"]);
+    expect(labelsForThemes(["advantage", "crushing", "enPassant", "castling"])).toEqual([]);
+  });
+
+  it("trains defending with both Lichess puzzles and own-game positions", () => {
+    const defending = LABELS.find((l) => l.id === "defending")!;
+    expect(defending.lichessThemes).toEqual(["equality"]);
+    expect(OWN_GAME_LABELS.map((l) => l.id)).toContain("defending");
+    expect(QUALIFYING_LABELS.has("defending")).toBe(true);
   });
 });
 
@@ -90,14 +103,13 @@ describe("drop reasons and report", () => {
       line("3", 1650, "advantage endgame"), // another band: would be added
       line("4", 1500, "fork crushing"), // kept already, so not "left out"
       line("5", 1500, "crushing", 10), // poor quality: ignored by the report
-      line("6", 1500, "mate mateIn2"), // mate in 2, not a 6+ candidate
-      line("7", 1700, "mate veryLong"), // mate in 6+
+      line("6", 1700, "castling middlegame"), // castling candidate, left out
     ]) {
       const p = parsePuzzleLine(l)!;
       r.record(p, f.decide(p));
     }
     expect(r.candidates.get("Converting (advantage/crushing)")).toEqual({ goodQuality: 4, leftOut: 3, wouldAdd: 2 });
-    expect(r.candidates.get("Mate in 6+ (mate, no mateInN)")).toEqual({ goodQuality: 1, leftOut: 1, wouldAdd: 1 });
-    expect(Object.fromEntries(r.topUnusedThemes())).toMatchObject({ crushing: 2, middlegame: 2, long: 2, advantage: 1 });
+    expect(r.candidates.get("Castling")).toEqual({ goodQuality: 1, leftOut: 1, wouldAdd: 1 });
+    expect(Object.fromEntries(r.topUnusedThemes())).toMatchObject({ crushing: 2, middlegame: 3, long: 2, advantage: 1, castling: 1 });
   });
 });

@@ -8,6 +8,9 @@
 //
 // The ~900 MB file is streamed and filtered line by line; it is never stored in full.
 // Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY unless --dry-run.
+//
+// A real run makes the store match this run exactly: kept puzzles are added or updated,
+// and stored puzzles this run didn't keep (e.g. after a label change) are removed at the end.
 
 import { createReadStream } from "node:fs";
 import { Readable } from "node:stream";
@@ -15,6 +18,7 @@ import type { ReadableStream as NodeWebStream } from "node:stream/web";
 import { requireDb, type Db } from "../src/lib/db";
 import { LABELS } from "../src/lib/labels";
 import { readLines } from "../src/lib/lines";
+import { removeUnselected } from "../src/lib/puzzle-store";
 import { FilterReport, parsePuzzleLine, PuzzleFilter, type Decision, type PuzzleRow } from "../src/lib/puzzles";
 
 try { process.loadEnvFile(".env.local"); } catch { /* no local file: use the real environment */ }
@@ -46,6 +50,7 @@ async function main() {
   const db = dryRun ? null : requireDb();
   const filter = new PuzzleFilter();
   const report = new FilterReport();
+  const keptIds = new Set<string>();
   let batch: PuzzleRow[] = [];
   const started = Date.now();
 
@@ -62,6 +67,7 @@ async function main() {
       console.log(`  ${filter.seen.toLocaleString()} read, ${filter.kept.toLocaleString()} kept`);
     }
     if (decision !== "kept") continue;
+    keptIds.add(puzzle.id);
     batch.push(puzzle);
     if (batch.length >= BATCH) {
       if (db) await save(db, batch);
@@ -73,6 +79,11 @@ async function main() {
   // A real run reads millions of lines. Almost none means the download wasn't the puzzle file.
   if (filter.seen < 1000) {
     throw new Error(`Only ${lines} lines and ${filter.seen} puzzles read: the file doesn't look like the Lichess puzzle database.`);
+  }
+
+  if (db) {
+    const removed = await removeUnselected(db, keptIds);
+    console.log(`Removed ${removed.toLocaleString()} stored puzzles this run didn't select.`);
   }
 
   console.log(`\nDone in ${Math.round((Date.now() - started) / 1000)}s: ${filter.seen.toLocaleString()} read, ${filter.kept.toLocaleString()} kept${dryRun ? " (dry run, nothing saved)" : ""}.`);

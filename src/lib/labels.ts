@@ -1,8 +1,8 @@
 // The fixed list of weakness labels (SPEC.md -> "Categories").
 //
-// Every label maps either to Lichess puzzle themes (so Lichess puzzles can train it)
-// or is "positional": computed by Blindspot itself and trained with "find the move"
-// positions from the user's own games (Phase 3).
+// Every label maps to Lichess puzzle themes (so Lichess puzzles can train it), or is
+// computed by Blindspot itself and trained with "find the move" positions from the
+// user's own games (Phase 3), or both.
 //
 // Adding a label later = adding one entry here.
 
@@ -23,6 +23,8 @@ export interface Label {
   lichessThemes: string[];
   /** Tactics and mates are tracked separately as "missed" and "allowed". */
   missedAllowed?: boolean;
+  /** Computed from the user's games and trained with "find the move" positions from them. */
+  fromOwnGames?: boolean;
 }
 
 const tactic = (id: string, name: string, themes: string[]): Label => ({
@@ -55,6 +57,9 @@ export const LABELS: Label[] = [
   tactic("promotion", "Promotion", ["promotion", "underPromotion"]),
   tactic("quietMove", "Quiet move", ["quietMove"]),
   tactic("defensiveMove", "Defensive move", ["defensiveMove"]),
+  tactic("kingsideAttack", "Kingside attack", ["kingsideAttack"]),
+  tactic("queensideAttack", "Queenside attack", ["queensideAttack"]),
+  tactic("zugzwang", "Zugzwang", ["zugzwang"]),
 
   // Mates
   mate("shortMate", "Short mates (in 1–2)", ["mateIn1", "mateIn2"]),
@@ -69,7 +74,7 @@ export const LABELS: Label[] = [
 
   // Game phase ("transition" has no Lichess theme: computed, trained positionally)
   { id: "phaseOpening", name: "Opening", family: "phase", lichessThemes: ["opening"] },
-  { id: "phaseTransition", name: "Transition (moves ~12–20)", family: "phase", lichessThemes: [] },
+  { id: "phaseTransition", name: "Transition (moves ~12–20)", family: "phase", lichessThemes: [], fromOwnGames: true },
   { id: "phaseMiddlegame", name: "Middlegame", family: "phase", lichessThemes: ["middlegame"] },
   { id: "phaseEndgame", name: "Endgame", family: "phase", lichessThemes: ["endgame"] },
 
@@ -81,15 +86,18 @@ export const LABELS: Label[] = [
   { id: "queenEndgame", name: "Queen endgame", family: "endgame", lichessThemes: ["queenEndgame"] },
   { id: "queenRookEndgame", name: "Queen and rook endgame", family: "endgame", lichessThemes: ["queenRookEndgame"] },
 
-  // Move type (computed, positional)
-  { id: "pawnDecisions", name: "Pawn decisions", family: "moveType", lichessThemes: [] },
-  { id: "recaptureChoice", name: "Recapture choice", family: "moveType", lichessThemes: [] },
-  { id: "tradeDecisions", name: "Trade decisions", family: "moveType", lichessThemes: [] },
+  // Move type (computed from the user's games)
+  { id: "pawnDecisions", name: "Pawn decisions", family: "moveType", lichessThemes: [], fromOwnGames: true },
+  { id: "recaptureChoice", name: "Recapture choice", family: "moveType", lichessThemes: [], fromOwnGames: true },
+  { id: "tradeDecisions", name: "Trade decisions", family: "moveType", lichessThemes: [], fromOwnGames: true },
 
-  // Position state (computed from the engine evaluation, positional)
-  { id: "converting", name: "Converting an advantage", family: "positionState", lichessThemes: [] },
-  { id: "defending", name: "Defending a worse position", family: "positionState", lichessThemes: [] },
-  { id: "balanced", name: "Balanced positions", family: "positionState", lichessThemes: [] },
+  // Position state (computed from the engine evaluation).
+  // Defending also uses Lichess "equality" puzzles: hold a draw from a worse position.
+  // ("advantage"/"crushing" describe what a puzzle's solution wins, not a position that is
+  // already won, so they don't fit "converting" and aren't used.)
+  { id: "converting", name: "Converting an advantage", family: "positionState", lichessThemes: [], fromOwnGames: true },
+  { id: "defending", name: "Defending a worse position", family: "positionState", lichessThemes: ["equality"], fromOwnGames: true },
+  { id: "balanced", name: "Balanced positions", family: "positionState", lichessThemes: [], fromOwnGames: true },
 
   // Openings are labelled per game from the game record (Phase 2) and trained with
   // Lichess puzzles via their OpeningTags column, so they are not listed one by one here.
@@ -124,4 +132,5 @@ export const QUALIFYING_LABELS = new Set(
   LABELS.filter((l) => l.lichessThemes.length > 0 && l.family !== "phase").map((l) => l.id),
 );
 
-export const POSITIONAL_LABELS = LABELS.filter((l) => l.lichessThemes.length === 0);
+/** Labels trained (also) with "find the move" positions from the user's own games. */
+export const OWN_GAME_LABELS = LABELS.filter((l) => l.fromOwnGames);
