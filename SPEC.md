@@ -15,11 +15,11 @@ Blindspot finds the gaps in the user's chess from his own chess.com games and tr
 
 ## Scope and users
 
-Version 1 is for one user, but every piece of data is stored per user so that logins can be added later without a rebuild.
+Version 1 is for one user, but every piece of data is stored per user and each user is tied to a login, so more users can be added later without a rebuild.
 
 - All games, analysis, weakness profiles, puzzle attempts and ratings are keyed to a user ID
 - The chess.com username is a setting, never hard-coded
-- Real login (Supabase or Clerk) is added in a later phase
+- Login (added in Phase 1): Supabase Auth with emailed one-tap sign-in links, no passwords. Only addresses on an allowlist (a Vercel setting) can use the app, checked on every request. Opening up to more users later means relaxing the allowlist and connecting a proper email sender (Supabase's built-in one only sends a few emails an hour)
 - Before any public release: check chess.com API terms for commercial use, and meet UK GDPR (privacy policy, data deletion)
 
 ## Data sources
@@ -187,12 +187,12 @@ Version 1 is phases 1–5; nothing is trainable until the analysis runs.
 
 **Phase 1A (warm-up, done):** a "hello world" page deployed from GitHub to Vercel
 
-1. **Foundations:** Next.js app replacing the hello-world page, Vercel deploy, Supabase database and schema (per-user from day one), theme system, settings page skeleton, chess.com import, filtered puzzle store.
+1. **Foundations:** Next.js app replacing the hello-world page, Vercel deploy, Supabase database and schema (per-user from day one), login (Supabase Auth, allowlist), theme system, settings page skeleton, chess.com import, filtered puzzle store.
 2. **Analysis:** Stockfish job, mistake tagging, weakness profiles; run the 12-month backlog. Milestone: the user can see his weakness profile from real games.
 3. **Training:** puzzle board, the four modes, attempt logging, analysis board with optional engine, positional "find the move" drills.
 4. **Progress:** Blindspot rating, Blitz gap, theme ratings, charts; switch on the daily schedule.
 5. **AI explanations:** an on-demand Explain button after a puzzle and on the analysis board. Stockfish and code establish the facts (the line, what is attacked, what the move fixes); the AI only puts them into words and never judges the position itself. Positional weaknesses first. Cost controls: prepaid provider credits with auto top-up off (hard cap); an in-app monthly budget and daily limit set in settings; a usage panel showing explanations and estimated spend this month; each position's explanation cached so repeats are free; a small, cheap model by default.
 
-**Later:** real logins and multiple users; mining unseen positional positions from Lichess games as a fairer test of positional training.
+**Later:** opening up to multiple users; mining unseen positional positions from Lichess games as a fairer test of positional training.
 
 **Out of scope:** random or free-choice puzzles, own-game positions outside the positional drills, a time-trouble category, app store release.

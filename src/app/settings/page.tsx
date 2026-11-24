@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { getAppContext } from "@/lib/app-data";
 import { describeTimeControl } from "@/lib/settings";
 import { SetupNotice } from "../setup-notice";
@@ -8,6 +9,7 @@ export const metadata: Metadata = { title: "Settings · Blindspot" };
 
 export default async function SettingsPage() {
   const ctx = await getAppContext();
+  if (ctx.status === "signed-out") redirect("/login");
   if (ctx.status !== "ready") {
     return (
       <>

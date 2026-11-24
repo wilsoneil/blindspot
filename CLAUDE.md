@@ -5,7 +5,7 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 ## Current status
 
 - Phase 1A (hello-world page deployed from GitHub to Vercel): done
-- Phase 1 (Foundations): code built and tested; waiting on the one-time setup in README.md (Supabase project, Vercel and GitHub secrets, first import and puzzle build)
+- Phase 1 (Foundations, including login): code built and tested; database connected; waiting on login setup, first import and puzzle build (README.md)
 - Next: Phase 2 (Analysis)
 
 Update this section when a phase is finished.
@@ -23,6 +23,7 @@ Update this section when a phase is finished.
 - **No personal game data in the repo.** Real games, PGNs, chess.com usernames (the user's or opponents'), ratings and analysis results are stored only in Supabase. They never go in test fixtures, sample data, logs or exported files. Tests use made-up or anonymised games.
 - **No hard-coded chess.com username.** It is always a setting.
 - **Everything is stored per user ID**, even though v1 has one user.
+- **Every page and server action checks the login itself** (`getAppContext` / `getSignedInUser`). The proxy is only a first line of defence; server actions can be called directly.
 
 ## Commands
 

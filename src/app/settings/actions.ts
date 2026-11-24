@@ -2,13 +2,14 @@
 
 // Saves the settings form. This runs on the server, never in the browser.
 //
-// Note: until real logins exist (a later phase), anyone who knows the site's address
-// could call this. It only changes settings; nothing here costs money or exposes data.
+// Server actions can be called directly by anyone who knows the site's address, so this
+// checks the login itself rather than trusting that the page was shown.
 
 import { revalidatePath } from "next/cache";
+import { getSignedInUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { parseSettingsForm, SettingsError, settingsToRow } from "@/lib/settings";
-import { getCurrentUserId } from "@/lib/user";
+import { getUserIdForLogin } from "@/lib/user";
 
 export interface SaveResult {
   ok: boolean;
@@ -16,12 +17,14 @@ export interface SaveResult {
 }
 
 export async function saveSettings(_prev: SaveResult | null, form: FormData): Promise<SaveResult> {
+  const login = await getSignedInUser();
+  if (!login) return { ok: false, message: "Please sign in again." };
   const db = getDb();
   if (!db) return { ok: false, message: "The database isn't connected yet." };
 
   try {
     const settings = parseSettingsForm(form);
-    const userId = await getCurrentUserId(db);
+    const userId = await getUserIdForLogin(db, login.authUserId);
     const { error } = await db
       .from("settings")
       .update({ ...settingsToRow(settings), updated_at: new Date().toISOString() })
