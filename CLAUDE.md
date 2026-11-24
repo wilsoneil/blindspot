@@ -5,7 +5,8 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 ## Current status
 
 - Phase 1A (hello-world page deployed from GitHub to Vercel): done
-- Next: Phase 1 (Foundations), as described under "Build phases" in SPEC.md
+- Phase 1 (Foundations): code built and tested; waiting on the one-time setup in README.md (Supabase project, Vercel and GitHub secrets, first import and puzzle build)
+- Next: Phase 2 (Analysis)
 
 Update this section when a phase is finished.
 
@@ -22,6 +23,13 @@ Update this section when a phase is finished.
 - **No personal game data in the repo.** Real games, PGNs, chess.com usernames (the user's or opponents'), ratings and analysis results are stored only in Supabase. They never go in test fixtures, sample data, logs or exported files. Tests use made-up or anonymised games.
 - **No hard-coded chess.com username.** It is always a setting.
 - **Everything is stored per user ID**, even though v1 has one user.
+
+## Commands
+
+- `npm run dev`: local site; `npm test`: tests; `npm run lint`; `npm run build`
+- `npm run import:games`, `npm run build:puzzles -- --dry-run`: data jobs (also GitHub Actions workflows)
+- Database changes go in a new numbered file in `supabase/migrations/`; never edit an applied one.
+- Next.js here is 16.x, newer than most training data: check `node_modules/next/dist/docs/` before using an unfamiliar API (see AGENTS.md). Cache Components is deliberately off.
 
 ## Stack
 
