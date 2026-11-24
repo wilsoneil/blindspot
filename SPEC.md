@@ -1,0 +1,198 @@
+# Blindspot — Chess Weakness Trainer Spec
+
+Last updated: 24 Nov 2026
+
+> **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
+
+## Purpose
+
+Blindspot finds the gaps in the user's chess from his own chess.com games and trains only those gaps, using rated Lichess puzzles. There is no random-puzzle mode: every puzzle is chosen because the analysis says it targets a weakness.
+
+- Primary focus: 5-minute blitz, where speed of pattern recognition matters most
+- Secondary: daily chess, as a separate profile
+- Success = blitz rating closing the gap on daily rating
+- Also a hands-on project for learning GitHub and Vercel
+
+## Scope and users
+
+Version 1 is for one user, but every piece of data is stored per user so that logins can be added later without a rebuild.
+
+- All games, analysis, weakness profiles, puzzle attempts and ratings are keyed to a user ID
+- The chess.com username is a setting, never hard-coded
+- Real login (Supabase or Clerk) is added in a later phase
+- Before any public release: check chess.com API terms for commercial use, and meet UK GDPR (privacy policy, data deletion)
+
+## Data sources
+
+| Source | What it gives | Access |
+| --- | --- | --- |
+| chess.com public API | Monthly game archives (PGN with clock times), current ratings by time control | Free, no key |
+| [Lichess puzzle database](https://database.lichess.org/) | About 6 million rated puzzles with themes, opening tags and popularity | Free, CC0 licence, one CSV |
+
+The Lichess file is about 900 MB uncompressed, so a build step pre-filters it into a smaller indexed puzzle store (keep only puzzles relevant to the weakness labels; stay well under Supabase's 500 MB free limit). The app never loads the full file.
+
+## Game analysis pipeline
+
+A scheduled job pulls new games daily, runs Stockfish over them and turns the mistakes into tagged weaknesses.
+
+1. **Import:** fetch new games from chess.com and store them with time control, colour, opening, result and clock data.
+2. **Evaluate:** run Stockfish on every position; flag moves where the evaluation drops past a mistake threshold. The Stockfish version and search budget are pinned, so a change in a score reflects the user's play, not engine settings.
+3. **Tag:** label each mistake by tactical theme (using Lichess's open-source puzzle tagger), game phase, opening, endgame type, move type, position state and colour.
+4. **Profile:** update the weakness scores for that time control.
+
+- Initial backlog: last 12 months of blitz, plus daily games for the secondary profile
+- Schedule: daily (GitHub Actions), processing only new games
+- No time-trouble category: puzzle speed covers that
+
+## Weakness profile
+
+The home screen shows the top weaknesses (default five) for the selected time control, each with a 0–100 severity score; the user picks which one to train.
+
+- Weaknesses can be tactical themes, openings, endgame types, game phases, move types or position states
+- Separate profiles per time control, with a filter; 5-minute is the default
+- Severity combines two signals:
+    - **Games:** how often the pattern causes mistakes, weighted by how costly they were and how recent
+    - **Puzzles:** accuracy and solve time on that theme; slow solves count as "not yet automatic"
+- Scores refresh as new games and puzzle results arrive
+
+### Categories
+
+Categories come from a fixed list; every one maps to a Lichess puzzle filter (or, for positional labels, to "find the move" positions from the user's games), so every weakness is trainable. A mistake can fall into several categories at once.
+
+**Full label list (v1):** based on the [Lichess puzzle themes](https://lichess.org/training/themes), plus labels the app computes itself.
+
+| Family | Labels | Source |
+| --- | --- | --- |
+| Tactical motifs (each tracked as missed / allowed) | Fork, pin, skewer, discovered attack, discovered or double check, hanging piece, trapped piece, capture the defender, deflection, attraction, clearance, interference, intermezzo, x-ray, sacrifice, attacking f2/f7, exposed king, advanced pawn, promotion, quiet move, defensive move | Lichess tagger |
+| Mates (each missed / allowed) | Short mates (in 1–2), longer mates (3+), back-rank mate, smothered mate, other mating patterns pooled | Lichess tagger |
+| Phase | Opening, transition (development done, roughly moves 12–20), middlegame, endgame | Computed |
+| Endgame type | Rook, pawn, bishop, knight, queen, queen and rook | Lichess themes |
+| Openings | Families by colour; White by variation, Black by own response; offbeat bucket | Game record |
+| Move type | Pawn decisions (push or recapture choice), recapture choice, trade decisions | Computed |
+| Position state | Converting an advantage, defending a worse position, balanced | Computed from evaluation |
+
+- **Missed** = the user had the tactic and didn't play it. **Allowed** = the user's move let the opponent play it.
+- Not used as weaknesses: Lichess goals, puzzle lengths and origins (used only for puzzle selection). Adding a label later should be a small change.
+
+**Openings by colour:**
+
+- **White:** narrow repertoire, so plenty of games per opening; scored down to variation level
+- **Black:** grouped by the user's own response (e.g. "my defence to 1.e4", "my setup against 1.d4"), not the opponent's opening, to pool small samples
+- **Rare openings** (a handful of games each) roll into one "Offbeat openings" bucket, which can itself surface as a weakness
+
+### Scoring method
+
+Each category gets a score per time control:
+
+1. **Count** every mistake in the category.
+2. **Weight by cost:** the drop in winning chance, not raw engine points, so throwing away a won game counts heavily and +9 to +6 barely counts.
+3. **Weight by recency:** exponential decay with a 60-day half-life (setting).
+4. **Normalise by exposure:** mistakes per game in which the situation arises, compared with the user's average.
+5. **Require evidence:** small samples are pulled towards the average, and a category seen in fewer than three distinct games cannot enter the top list.
+
+The game score is blended with puzzle performance on the matching theme (solved within target time, against expectation for the puzzle rating), defaulting to 70% games and 30% puzzles (setting). Blended scores are then scaled 0–100 against each other, so the top list shows the weakest areas relative to the rest of the user's game.
+
+**Combinations:** categories are also scored in pairs, never triples (e.g. "pawn decisions in the transition"). A pair only replaces its broader label when it has at least 8 distinct games of evidence, is clearly worse than the broader label on its own, and has at least 200 matching puzzles. At most two of the top five can be pairs; otherwise the broader label is shown.
+
+## Training modes
+
+Four modes, all drawing only on puzzles matched to the weakness profile. Only Drill targets a single weakness; Rush, Survival and Blindspot mix all top weaknesses.
+
+| Mode | Puzzles from | Format | Mistakes |
+| --- | --- | --- | --- |
+| Drill | One chosen weakness | Timed and logged, own pace | Unlimited retries, reveal solution, analysis board |
+| Rush | All top weaknesses, shuffled | As many as possible in 5 minutes (setting), rising difficulty | A wrong move ends that puzzle, no retry |
+| Survival | All top weaknesses, shuffled | Open-ended, rising difficulty | Three mistakes (setting) ends the run |
+| Blindspot | All top weaknesses, shuffled, unlabelled, plus past failures and slow solves | Timed and logged, own pace | As Drill |
+
+- Failed or slow puzzles return in later Blindspot sessions on a spaced-repetition schedule.
+- **Positional weaknesses** (transition, pawn decisions, other computed labels with no Lichess theme) use "find the move" positions from the user's own games: open format, no multiple choice, and any move within a small margin of Stockfish's best is accepted. Drill serves them when that weakness is chosen; the mixed modes include them alongside Lichess puzzles, with difficulty approximated by how subtle the best move is. They count towards each run's score but never towards the Blindspot rating, and are tracked separately as accuracy and speed.
+
+## Puzzle experience
+
+Every attempt logs the result and the time taken; both feed the weakness score and puzzle selection.
+
+- Each puzzle is timed; the log records correct or wrong, solve time, retries and whether the solution was revealed
+- A puzzle only counts as fully solved if it is correct within its target time. Only the first attempt at any puzzle counts towards ratings; repeats train but don't score, so remembered answers can't inflate progress
+- Analysis board from any puzzle: step back through the moves and move pieces freely to explore alternative lines
+- Optional Stockfish in the browser on the analysis board: evaluation bar plus the top one or two moves, off by default so it never gives away a puzzle
+- Difficulty adapts to measured puzzle performance, not chess.com game rating (the scales differ)
+
+## Progress and headline metrics
+
+The home screen leads with the Blindspot rating as the primary number, with the Blitz gap shown smaller beneath it; each has a line chart over the last week, month and all time.
+
+- **Blindspot rating:** one overall Glicko-2 rating across all rated Lichess puzzles attempted in the app (first attempts only). It only rises for solves that are correct and within target time.
+- **Blitz gap:** daily rating minus blitz rating, from chess.com ratings fetched daily and smoothed as a 30-day average so a single bad session doesn't swing it. Shown in points, for example "600 and falling"; falling = closing the gap. Show both underlying ratings in small print.
+- Underneath: a rating per weakness theme (leading indicator) and each weakness score's trend from games (lagging indicator, showing whether training carries over to real play)
+
+## Settings
+
+One settings page holds every adjustable choice; defaults are what the spec describes.
+
+| Setting | Default | Range or options |
+| --- | --- | --- |
+| chess.com username | (set on first run) | Any username |
+| Focus time control | 5-minute blitz | Any time control played |
+| Number of weaknesses shown | 5 | 3–8; fewer shown if fewer pass the evidence rule |
+| Games vs puzzles blend | 70 / 30 | 0–100% games |
+| Recency half-life | 60 days | 14–365 days |
+| Analysis history window | Last 12 months | 3 months to all games |
+| Target solve time | Set per puzzle difficulty | Stricter or looser |
+| Rush length | 5 minutes | 3, 5 or 10 minutes |
+| Survival lives | 3 | 1–5 |
+| Engine on analysis board | Off | On / off |
+| Theme | Slate | Slate, Tournament, Paper |
+| AI explanations: monthly budget | £5 | Any amount; off |
+| AI explanations: daily limit | 20 | Any number |
+
+The AI usage panel (explanations and estimated spend this month) also sits on this page.
+
+## Look and feel
+
+Clean and simple, phone-first, installable to the Android home screen (PWA), built on a theme system where a new theme is one small config file.
+
+| Theme | Palette | Use |
+| --- | --- | --- |
+| Slate (default) | Blue and grey | Everyday |
+| Tournament | Dark green and near-black | Classic club-board feel, dark |
+| Paper | Light, warm neutrals | Daytime |
+
+Each theme sets the board squares, UI colours and chart colours together.
+
+## Architecture, costs and security
+
+Everything runs on free tiers; the heavy analysis runs on GitHub's servers, and the phone only talks to Vercel.
+
+```
+chess.com API ──> Daily analysis job (GitHub Actions: Stockfish + tagger) ──┐
+                                                                             ├──> Database (Supabase)
+Lichess puzzle DB ──> Puzzle filter (one-off build step) ───────────────────┘          ▲
+                                                                                        │ reads/writes
+GitHub repo ──(deploys on every change)──> Vercel (web app + server functions) ────────┘
+                                                   │
+                                                   ▼
+                                     Phone (browser / home-screen app;
+                                     Stockfish WASM for the analysis board)
+```
+
+- **Stack:** Next.js web app on Vercel; chessground board and chess.js rules; Stockfish (native in the job, WebAssembly in the browser); Supabase Postgres database
+- **Costs:** GitHub Actions is free and unlimited on a public repo, or 2,000 minutes a month on a private one. The 12-month backlog fits within one month. Vercel (Hobby, personal non-commercial) and Supabase free tiers cover one user. Supabase free projects pause after a week without database activity; the daily job keeps it active.
+- **Secrets:** the only API key is for the AI explanations (chess.com and Lichess are open); it sits in a Vercel server function with a spending cap. The database credentials and any future key live in Vercel and GitHub settings, never in code or chat. `.env` is ignored by Git from the first commit, and secret scanning is on.
+- **Personal game data:** chess.com game records contain the user's and opponents' usernames, so imported games, analysis results and ratings are stored only in Supabase. They are never committed to the repo: no real games in test fixtures, sample data, logs or exported files. Tests use made-up or anonymised games.
+
+## Build phases and out of scope
+
+Version 1 is phases 1–5; nothing is trainable until the analysis runs.
+
+**Phase 1A (warm-up, done):** a "hello world" page deployed from GitHub to Vercel
+
+1. **Foundations:** Next.js app replacing the hello-world page, Vercel deploy, Supabase database and schema (per-user from day one), theme system, settings page skeleton, chess.com import, filtered puzzle store.
+2. **Analysis:** Stockfish job, mistake tagging, weakness profiles; run the 12-month backlog. Milestone: the user can see his weakness profile from real games.
+3. **Training:** puzzle board, the four modes, attempt logging, analysis board with optional engine, positional "find the move" drills.
+4. **Progress:** Blindspot rating, Blitz gap, theme ratings, charts; switch on the daily schedule.
+5. **AI explanations:** an on-demand Explain button after a puzzle and on the analysis board. Stockfish and code establish the facts (the line, what is attacked, what the move fixes); the AI only puts them into words and never judges the position itself. Positional weaknesses first. Cost controls: prepaid provider credits with auto top-up off (hard cap); an in-app monthly budget and daily limit set in settings; a usage panel showing explanations and estimated spend this month; each position's explanation cached so repeats are free; a small, cheap model by default.
+
+**Later:** real logins and multiple users; mining unseen positional positions from Lichess games as a fairer test of positional training.
+
+**Out of scope:** random or free-choice puzzles, own-game positions outside the positional drills, a time-trouble category, app store release.
