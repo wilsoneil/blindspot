@@ -190,7 +190,7 @@ Version 1 is phases 1–5; nothing is trainable until the analysis runs.
 1. **Foundations:** Next.js app replacing the hello-world page, Vercel deploy, Supabase database and schema (per-user from day one), login (Supabase Auth, allowlist), theme system, settings page skeleton, chess.com import, filtered puzzle store.
 2. **Analysis:** Stockfish job, mistake tagging, weakness profiles; run the 12-month backlog. Milestone: the user can see his weakness profile from real games.
 3. **Training:** puzzle board, the four modes, attempt logging, analysis board with optional engine, positional "find the move" drills.
-4. **Progress:** Blindspot rating, Blitz gap, theme ratings, charts; switch on the daily schedule.
+4. **Progress:** Blindspot rating, Blitz gap, theme ratings, charts. (The daily import schedule was switched on early, in Phase 1.)
 5. **AI explanations:** an on-demand Explain button after a puzzle and on the analysis board. Stockfish and code establish the facts (the line, what is attacked, what the move fixes); the AI only puts them into words and never judges the position itself. Positional weaknesses first. Cost controls: prepaid provider credits with auto top-up off (hard cap); an in-app monthly budget and daily limit set in settings; a usage panel showing explanations and estimated spend this month; each position's explanation cached so repeats are free; a small, cheap model by default.
 
 **Later:** opening up to multiple users; mining unseen positional positions from Lichess games as a fairer test of positional training.
