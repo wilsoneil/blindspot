@@ -118,16 +118,13 @@ export class PuzzleFilter {
 // Report on what was left out, to judge whether the labels cover enough
 // ---------------------------------------------------------------------------
 
-const MATE_IN_N = ["mateIn1", "mateIn2", "mateIn3", "mateIn4", "mateIn5"];
-
-/** Lichess themes we don't use yet, and how a label for each would pick puzzles. */
+/**
+ * Lichess themes we don't use, kept in the report to keep an eye on them.
+ * (Reviewed Nov 2026: advantage/crushing describe what a solution wins, not a won
+ * position; en passant and castling are too narrow to be weaknesses.)
+ */
 export const CANDIDATES: { name: string; matches: (themes: string[]) => boolean }[] = [
   { name: "Converting (advantage/crushing)", matches: (t) => t.includes("advantage") || t.includes("crushing") },
-  { name: "Defending (equality)", matches: (t) => t.includes("equality") },
-  { name: "Mate in 6+ (mate, no mateInN)", matches: (t) => t.includes("mate") && !t.some((x) => MATE_IN_N.includes(x)) },
-  { name: "Zugzwang", matches: (t) => t.includes("zugzwang") },
-  { name: "Kingside attack", matches: (t) => t.includes("kingsideAttack") },
-  { name: "Queenside attack", matches: (t) => t.includes("queensideAttack") },
   { name: "En passant", matches: (t) => t.includes("enPassant") },
   { name: "Castling", matches: (t) => t.includes("castling") },
 ];

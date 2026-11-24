@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 24 Nov 2026
+Last updated: 24 Nov 2026 (labels reviewed against the Lichess database)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -63,16 +63,17 @@ Categories come from a fixed list; every one maps to a Lichess puzzle filter (or
 
 | Family | Labels | Source |
 | --- | --- | --- |
-| Tactical motifs (each tracked as missed / allowed) | Fork, pin, skewer, discovered attack, discovered or double check, hanging piece, trapped piece, capture the defender, deflection, attraction, clearance, interference, intermezzo, x-ray, sacrifice, attacking f2/f7, exposed king, advanced pawn, promotion, quiet move, defensive move | Lichess tagger |
+| Tactical motifs (each tracked as missed / allowed) | Fork, pin, skewer, discovered attack, discovered or double check, hanging piece, trapped piece, capture the defender, deflection, attraction, clearance, interference, intermezzo, x-ray, sacrifice, attacking f2/f7, exposed king, advanced pawn, promotion, quiet move, defensive move, kingside attack, queenside attack, zugzwang | Lichess tagger |
 | Mates (each missed / allowed) | Short mates (in 1–2), longer mates (3+), back-rank mate, smothered mate, other mating patterns pooled | Lichess tagger |
 | Phase | Opening, transition (development done, roughly moves 12–20), middlegame, endgame | Computed |
 | Endgame type | Rook, pawn, bishop, knight, queen, queen and rook | Lichess themes |
 | Openings | Families by colour; White by variation, Black by own response; offbeat bucket | Game record |
 | Move type | Pawn decisions (push or recapture choice), recapture choice, trade decisions | Computed |
-| Position state | Converting an advantage, defending a worse position, balanced | Computed from evaluation |
+| Position state | Converting an advantage, defending a worse position, balanced | Computed from evaluation; defending is also trained with Lichess "equality" puzzles |
 
 - **Missed** = the user had the tactic and didn't play it. **Allowed** = the user's move let the opponent play it.
-- Not used as weaknesses: Lichess goals, puzzle lengths and origins (used only for puzzle selection). Adding a label later should be a small change.
+- Not used as weaknesses: Lichess goals, puzzle lengths and origins (used only for puzzle selection). The one exception: the "equality" goal (hold a draw from a worse position) supplies puzzles for "defending a worse position". "Advantage" and "crushing" describe what a puzzle's solution wins, not an already-won position, so they don't train "converting". Adding a label later should be a small change.
+- Label coverage was checked against the whole Lichess database (Nov 2026): kingside attack, queenside attack, zugzwang and equality were added; en passant and castling were left out as too narrow. Each puzzle build prints the same report, so coverage can be rechecked.
 
 **Openings by colour:**
 
