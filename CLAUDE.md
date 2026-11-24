@@ -5,7 +5,7 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 ## Current status
 
 - Phase 1A (hello-world page deployed from GitHub to Vercel): done
-- Phase 1 (Foundations, including login): code built and tested; database connected; waiting on login setup, first import and puzzle build (README.md)
+- Phase 1 (Foundations, including login): done. Sign-in live; games imported (daily import scheduled); puzzle store built (141,430 puzzles, every label covered)
 - Next: Phase 2 (Analysis)
 
 Update this section when a phase is finished.
