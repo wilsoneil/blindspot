@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getAppContext } from "@/lib/app-data";
 import type { Db } from "@/lib/db";
 import { describeTimeControl } from "@/lib/settings";
@@ -27,6 +28,7 @@ async function loadStatus(db: Db, userId: string, focusTimeControl: string) {
 
 export default async function Home() {
   const ctx = await getAppContext();
+  if (ctx.status === "signed-out") redirect("/login");
   if (ctx.status !== "ready") return <SetupNotice ctx={ctx} />;
 
   const { settings } = ctx;
