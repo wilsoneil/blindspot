@@ -10,11 +10,14 @@ import { describeProfileKey, loadProfiles, profileKeyForSetting } from "@/lib/we
 import { SetupNotice } from "../setup-notice";
 import { Run } from "./run";
 
+/** Rush always ends after this many failed puzzles (or when the clock runs out). */
+export const RUSH_LIVES = 3;
+
 const TEXT = {
   rush: (s: { rushMinutes: number }) =>
-    `As many puzzles as you can in ${s.rushMinutes} minutes, getting harder as you go. A wrong move ends that puzzle; there are no retries.`,
+    `As many puzzles as you can in ${s.rushMinutes} minutes, getting harder as you go. A wrong move ends that puzzle; ${RUSH_LIVES} failed puzzles end the rush.`,
   survival: (s: { survivalLives: number }) =>
-    `Puzzles keep coming, getting harder, until you've made ${s.survivalLives} mistake${s.survivalLives === 1 ? "" : "s"}.`,
+    `Puzzles keep coming, getting harder, until you've failed ${s.survivalLives} of them.`,
 };
 
 export async function MixedModePage({ mode, tc }: { mode: "rush" | "survival"; tc?: string }) {
@@ -45,14 +48,14 @@ export async function MixedModePage({ mode, tc }: { mode: "rush" | "survival"; t
   return (
     <section className="card">
       <h1>{title} <span className="pill">{describeProfileKey(profileKey)}</span></h1>
-      <p className="small muted">{TEXT[mode](ctx.settings)} Puzzles come from all your top weaknesses, mixed.</p>
       <Run
         mode={mode}
         profileKey={profileKey}
         weaknessKeys={weaknesses.map((w) => w.key)}
         initial={puzzles.map((p) => clientPuzzle(p, ctx.settings, level))}
         rushMs={ctx.settings.rushMinutes * 60_000}
-        lives={ctx.settings.survivalLives}
+        lives={mode === "rush" ? RUSH_LIVES : ctx.settings.survivalLives}
+        intro={`${TEXT[mode](ctx.settings)} Puzzles come from all your top weaknesses, mixed with earlier misses that are due for another look.`}
       />
       {back}
     </section>

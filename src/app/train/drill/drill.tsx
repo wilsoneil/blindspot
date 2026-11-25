@@ -25,12 +25,9 @@ function reviewNote(r: ReviewChange): string {
   }
 }
 
-/**
- * Own-pace training with retries, Show solution and analysis. Drill: one weakness.
- * Blindspot mode: all the top weaknesses, unlabelled, plus puzzles due for review.
- */
-export function Drill({ mode = "drill", weaknessKeys, profileKey, initial, engineDefault }: {
-  mode?: "drill" | "blindspot"; weaknessKeys: string[]; profileKey: string; initial: ClientPuzzle[]; engineDefault: boolean;
+/** Drill: one weakness, own pace, with retries, Show solution and analysis. */
+export function Drill({ weaknessKey, profileKey, initial, engineDefault }: {
+  weaknessKey: string; profileKey: string; initial: ClientPuzzle[]; engineDefault: boolean;
 }) {
   const [queue, setQueue] = useState(initial);
   const [index, setIndex] = useState(0);
@@ -47,8 +44,7 @@ export function Drill({ mode = "drill", weaknessKeys, profileKey, initial, engin
   async function onFinish(r: PuzzleResult) {
     setResult(r);
     const saved = await saveAttempt({
-      ...attemptRef(puzzle), sessionId: sessionId.current, mode, profileKey,
-      weaknessKey: mode === "drill" ? weaknessKeys[0] : null,
+      ...attemptRef(puzzle), sessionId: sessionId.current, mode: "drill", profileKey, weaknessKey,
       solved: r.solved, solveMs: r.solveMs, wrongMoves: r.wrongMoves, revealed: r.revealed,
     });
     if (saved.ok) {
@@ -59,7 +55,7 @@ export function Drill({ mode = "drill", weaknessKeys, profileKey, initial, engin
     }
     // Keep a few puzzles ahead.
     if (queue.length - index <= 2) {
-      const more = await morePuzzles(mode, weaknessKeys, [...seen.current]);
+      const more = await morePuzzles(weaknessKey, [...seen.current]);
       if (more.ok) {
         const fresh = more.value.filter((p) => !seen.current.has(p.id));
         for (const p of fresh) seen.current.add(p.id);
@@ -118,7 +114,7 @@ export function Drill({ mode = "drill", weaknessKeys, profileKey, initial, engin
             {analysing ? "Close analysis" : "Analyse"}
           </button>
           <span className="small muted">
-            {outcome && !outcome.firstAttempt && !puzzle.review ? "Repeat: trains, but doesn't count. " : ""}
+            {outcome && !outcome.firstAttempt ? "Repeat: trains, but doesn't count. " : ""}
             {outcome ? reviewNote(outcome.review) + " " : ""}
             {outcome ? `Session: ${outcome.session.solved} of ${outcome.session.attempted} solved.` : ""}
           </span>
@@ -126,7 +122,6 @@ export function Drill({ mode = "drill", weaknessKeys, profileKey, initial, engin
       )}
       {message && <p className="small message-error" style={{ marginTop: "0.5rem" }}>{message}</p>}
       <p className="small muted" style={{ marginTop: "0.75rem" }}>
-        {puzzle.review && <span className="pill" style={{ marginRight: "0.4rem" }}>Review</span>}
         {puzzle.position ? (
           result ? (
             <>

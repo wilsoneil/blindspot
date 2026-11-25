@@ -12,7 +12,6 @@ import { settingsFromRow, type Settings, type SettingsRow } from "@/lib/settings
 import { AttemptError, recordPuzzleAttempt, type AttemptInput, type AttemptOutcome } from "@/lib/training/attempts";
 import { clientPuzzle, type ClientPuzzle } from "@/lib/training/client-puzzle";
 import { puzzleLevel } from "@/lib/training/rating";
-import { selectBlindspot } from "@/lib/training/blindspot";
 import { selectRunPuzzles } from "@/lib/training/run";
 import { selectFor, weaknessFromKey } from "@/lib/training/sources";
 import { getUserIdForLogin } from "@/lib/user";
@@ -60,25 +59,15 @@ const weaknessesOf = (keys: string[]) => keys.slice(0, 8).flatMap((k) => {
   return w ? [w] : [];
 });
 
-/**
- * More puzzles for Drill (one weakness) or Blindspot mode (all the given weaknesses plus due
- * reviews), skipping the ones already in this session.
- */
-export async function morePuzzles(
-  mode: "drill" | "blindspot", weaknessKeys: string[], exclude: string[],
-): Promise<ActionResult<ClientPuzzle[]>> {
+/** More puzzles for a Drill, skipping the ones already in this session. */
+export async function morePuzzles(weaknessKey: string, exclude: string[]): Promise<ActionResult<ClientPuzzle[]>> {
   try {
     const ctx = await signedIn();
     if (!ctx) return { ok: false, message: "Please sign in again." };
-    const weaknesses = weaknessesOf(mode === "drill" ? weaknessKeys.slice(0, 1) : weaknessKeys);
-    if (weaknesses.length === 0 && mode === "drill") {
-      return { ok: false, message: "This weakness can't be trained yet." };
-    }
+    const [weakness] = weaknessesOf([weaknessKey]);
+    if (!weakness) return { ok: false, message: "This weakness can't be trained yet." };
     const level = await puzzleLevel(ctx.db, ctx.userId);
-    const o = { userId: ctx.userId, level, exclude: exclude.slice(0, 500) };
-    const puzzles = mode === "drill"
-      ? await selectFor(ctx.db, weaknesses[0], { ...o, count: 5 })
-      : await selectBlindspot(ctx.db, { ...o, weaknesses, count: 6 });
+    const puzzles = await selectFor(ctx.db, weakness, { userId: ctx.userId, level, exclude: exclude.slice(0, 500), count: 5 });
     return { ok: true, value: puzzles.map((p) => clientPuzzle(p, ctx.settings, level)) };
   } catch (e) {
     console.error("Loading puzzles failed", e);

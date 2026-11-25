@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "../src/lib/settings";
 import { recordPuzzleAttempt } from "../src/lib/training/attempts";
-import { selectBlindspot } from "../src/lib/training/blindspot";
+import { loadDueReviews } from "../src/lib/training/run";
 import { FindMoveRun } from "../src/lib/training/play";
 import { selectPositions } from "../src/lib/training/positions";
 import { currentRating, START } from "../src/lib/training/rating";
@@ -109,12 +109,13 @@ describe("attempts at the user's own positions", () => {
     await expect(recordPuzzleAttempt(db, "u1", DEFAULT_SETTINGS, { ...input, mistakeId: 2 }, 1500)).rejects.toThrow("isn't one of yours");
   });
 
-  it("put a missed position on the review queue, and Blindspot mode brings it back", async () => {
+  it("put a missed position on the review queue, and it comes back when due", async () => {
     const { db, tables } = setup();
     await recordPuzzleAttempt(db, "u1", DEFAULT_SETTINGS, { ...input, wrongMoves: 1 }, 1500);
     expect(tables.review_queue[0]).toMatchObject({ user_id: "u1", mistake_id: 1, step: 0 });
+    expect(await loadDueReviews(db, "u1", { limit: 4, level: 1500 })).toEqual([]); // not due yet
     const tomorrow = new Date(Date.now() + 2 * 86_400_000);
-    const got = await selectBlindspot(db, { userId: "u1", weaknesses: [], level: 1500, count: 4, now: tomorrow });
+    const got = await loadDueReviews(db, "u1", { limit: 4, level: 1500, now: tomorrow });
     expect(got.map((p) => [p.id, p.review])).toEqual([["m1", true]]);
   });
 });

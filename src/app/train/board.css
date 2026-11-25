@@ -104,5 +104,6 @@
   font-size: 1.1rem;
 }
 .run-clock { font-variant-numeric: tabular-nums; font-weight: 700; }
+.run-lives { letter-spacing: 0.1em; }
 .run-clock.over { color: var(--bad); }
 .run-results { margin: 0.75rem 0 0; padding-left: 1.5rem; columns: 2; }

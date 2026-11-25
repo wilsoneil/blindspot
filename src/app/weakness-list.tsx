@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { describeKey } from "@/lib/analysis/profile";
 import { weaknessFromKey } from "@/lib/training/sources";
+import type { DrillStat } from "@/lib/training/stats";
 import type { StoredProfile } from "@/lib/weakness-store";
 
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
-export function WeaknessList({ profile, shown }: { profile: StoredProfile; shown: number }) {
+export function WeaknessList({ profile, shown, drills = {} }: {
+  profile: StoredProfile; shown: number; drills?: Record<string, DrillStat>;
+}) {
   const top = profile.top.slice(0, shown);
   return (
     <>
@@ -35,13 +38,18 @@ export function WeaknessList({ profile, shown }: { profile: StoredProfile; shown
             <div className="small muted">
               {w.mistakes} mistake{w.mistakes === 1 ? "" : "s"} in {w.games} game{w.games === 1 ? "" : "s"}
             </div>
+            {drills[w.key] && (
+              <div className="small weakness-training">
+                ▶ {drills[w.key].attempted} puzzle{drills[w.key].attempted === 1 ? "" : "s"} drilled this week
+                {" · "}{Math.round((100 * drills[w.key].solved) / drills[w.key].attempted)}% solved
+              </div>
+            )}
           </li>
         ))}
       </ol>
       {top.some((w) => weaknessFromKey(w.key)) && (
         <div className="modes">
-          <span className="small muted">All your top weaknesses, mixed:</span>
-          <Link className="button" href={`/train/blindspot?tc=${encodeURIComponent(profile.profileKey)}`}>Blindspot</Link>
+          <span className="small muted">All weaknesses, mixed:</span>
           <Link className="button" href={`/train/rush?tc=${encodeURIComponent(profile.profileKey)}`}>Rush</Link>
           <Link className="button" href={`/train/survival?tc=${encodeURIComponent(profile.profileKey)}`}>Survival</Link>
         </div>

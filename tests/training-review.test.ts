@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectBlindspot } from "../src/lib/training/blindspot";
+import { CHUNK, placeReviews, REVIEWS_PER_CHUNK, selectRunPuzzles } from "../src/lib/training/run";
 import { dueReviews, INTERVAL_DAYS, nextReview, updateReview } from "../src/lib/training/review";
 import { fakeDb } from "./fake-db";
 
@@ -60,43 +60,65 @@ describe("updateReview and dueReviews", () => {
   });
 });
 
-describe("selectBlindspot", () => {
+describe("reviews in Rush and Survival", () => {
   const puzzle = (id: string, labels: string[], rating = 1500) => ({
     id, fen: "8/8/8/8/8/8/8/8 w - - 0 1", moves: "a2a3 a7a6", rating, themes: [], labels,
   });
+  // Plenty of new puzzles across the ladder, and four earlier misses (three due) at 1250, 1600, 1900, 1500.
   const puzzles = [
-    ...Array.from({ length: 20 }, (_, i) => puzzle(`f${i}`, ["fork"])),
-    ...Array.from({ length: 20 }, (_, i) => puzzle(`p${i}`, ["pin"])),
-    puzzle("old1", ["skewer"]), puzzle("old2", ["skewer"]), puzzle("old3", ["fork"]), puzzle("old4", ["pin"]),
+    ...Array.from({ length: 60 }, (_, i) => puzzle(`f${i}`, ["fork"], 1000 + 20 * i)),
+    ...Array.from({ length: 60 }, (_, i) => puzzle(`p${i}`, ["pin"], 1000 + 20 * i)),
+    puzzle("old1", ["skewer"], 1250), puzzle("old2", ["skewer"], 1600), puzzle("old3", ["fork"], 1900), puzzle("old4", ["pin"], 1500),
   ];
   const queue = ["old1", "old2", "old3", "old4"].map((id, i) => ({
     id: i + 1, user_id: "u1", puzzle_id: id, mistake_id: null, step: 0, due_at: days(i < 3 ? -1 : 2).toISOString(),
   }));
   const attempts = ["old1", "old2", "old3", "old4"].map((id, i) => ({ id: i + 1, user_id: "u1", puzzle_id: id }));
-
-  it("mixes due reviews (at most half) with new puzzles from every weakness", async () => {
+  const run = (o: { exclude?: string[]; chunks?: number } = {}) => {
     const { db } = fakeDb({ puzzles, review_queue: queue, puzzle_attempts: attempts });
-    const got = await selectBlindspot(db, { userId: "u1", weaknesses: [W("fork"), W("pin")], level: 1500, count: 6, now: NOW });
-    expect(got).toHaveLength(6);
-    const reviews = got.filter((p) => p.review).map((p) => p.id).sort();
-    expect(reviews).toEqual(["old1", "old2", "old3"]); // old4 isn't due yet
-    const fresh = got.filter((p) => !p.review);
-    expect(new Set(fresh.map((p) => p.labels[0]))).toEqual(new Set(["fork", "pin"]));
-    expect(fresh.every((p) => !p.id.startsWith("old"))).toBe(true);
-  });
-
-  it("skips reviews already served this session, and caps them when many are due", async () => {
-    const { db } = fakeDb({ puzzles, review_queue: queue, puzzle_attempts: attempts });
-    const got = await selectBlindspot(db, {
-      userId: "u1", weaknesses: [W("fork"), W("pin")], level: 1500, count: 2, exclude: ["old1"], now: NOW,
+    return selectRunPuzzles(db, {
+      userId: "u1", weaknesses: [W("fork"), W("pin")], level: 1500, fromChunk: 0, chunks: o.chunks ?? 3, exclude: o.exclude, now: NOW,
     });
-    expect(got.filter((p) => p.review).map((p) => p.id)).toEqual(["old2"]); // half of 2
-    expect(got).toHaveLength(2);
+  };
+
+  it("brings back due misses, at most a third of each group, among new puzzles", async () => {
+    const got = await run({ chunks: 5 });
+    expect(got.filter((p) => p.review).map((p) => p.id).sort()).toEqual(["old1", "old2", "old3"]); // old4 isn't due
+    for (let c = 0; c < 5; c++) {
+      const chunk = got.slice(c * CHUNK, (c + 1) * CHUNK);
+      expect(chunk).toHaveLength(CHUNK);
+      expect(chunk.filter((p) => p.review).length).toBeLessThanOrEqual(REVIEWS_PER_CHUNK);
+    }
+    expect(got.filter((p) => !p.review).every((p) => !p.id.startsWith("old"))).toBe(true);
   });
 
-  it("serves only reviews when no weakness can be trained with puzzles", async () => {
-    const { db } = fakeDb({ puzzles, review_queue: queue, puzzle_attempts: attempts });
-    const got = await selectBlindspot(db, { userId: "u1", weaknesses: [], level: 1500, count: 6, now: NOW });
-    expect(got.map((p) => p.id).sort()).toEqual(["old1", "old2", "old3"]);
+  it("places each review in the group matching its difficulty, keeping the group easiest first", async () => {
+    const got = await run({ chunks: 5 });
+    const chunkOf = (id: string) => Math.floor(got.findIndex((p) => p.id === id) / CHUNK);
+    // Groups centre on 1262, 1412, 1562, 1712, 1862: old1 (1250) fits the first, old2 (1600)
+    // the third, old3 (1900) the fifth.
+    expect(chunkOf("old1")).toBe(0);
+    expect(chunkOf("old2")).toBe(2);
+    expect(chunkOf("old3")).toBe(4);
+    for (let c = 0; c < 5; c++) {
+      const r = got.slice(c * CHUNK, (c + 1) * CHUNK).map((p) => p.rating);
+      expect(r).toEqual([...r].sort((a, b) => a - b));
+    }
+  });
+
+  it("keeps a hard review for later when the run hasn't climbed that high yet", async () => {
+    const got = await run({ chunks: 2 });
+    expect(got.some((p) => p.id === "old3")).toBe(false);
+  });
+
+  it("puts reviews in the next group when one is full, and easy ones in the first group fetched", () => {
+    const r = (id: string, rating: number) => ({ id, fen: "", moves: [], rating, themes: [], labels: [], review: true });
+    const placed = placeReviews([r("a", 1250), r("b", 1260), r("c", 1270), r("d", 600)], 1500, 3, 2);
+    expect([...placed.entries()].map(([c, l]) => [c, l.map((x) => x.id)])).toEqual([[3, ["d", "a"]], [4, ["b", "c"]]]);
+  });
+
+  it("skips reviews already served in this run", async () => {
+    const got = await run({ exclude: ["old1"], chunks: 1 });
+    expect(got.some((p) => p.id === "old1")).toBe(false);
   });
 });

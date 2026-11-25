@@ -8,7 +8,7 @@ import { clientPuzzle } from "@/lib/training/client-puzzle";
 import { puzzleLevel } from "@/lib/training/rating";
 import { trainingSource } from "@/lib/training/select";
 import { selectFor, weaknessFromKey } from "@/lib/training/sources";
-import { describeProfileKey, profileKeyForSetting } from "@/lib/weakness-store";
+import { profileKeyForSetting } from "@/lib/weakness-store";
 import { SetupNotice } from "../../setup-notice";
 import { Drill } from "./drill";
 
@@ -41,21 +41,12 @@ export default async function DrillPage({ searchParams }: PageProps<"/train/dril
   const level = await puzzleLevel(ctx.db, ctx.userId); // the Blindspot rating: hidden until Phase 4
   const puzzles = await selectFor(ctx.db, weakness, { userId: ctx.userId, count: 5, level });
   const own = weakness.kind === "ownGames";
-  const opening = weakness.kind === "opening";
   return (
     <section className="card">
       <h1>{describeKey(weaknessKey)} <span className="pill">Drill</span></h1>
-      <p className="small muted">
-        {own
-          ? "Positions from your own games where you went wrong. Find the move you missed: any move close to the engine's best counts."
-          : opening
-            ? "Lichess puzzles from games in this opening, so the typical tactics and plans become familiar."
-            : `Puzzles chosen for this weakness from your ${describeProfileKey(profileKey)} games.`}{" "}
-        Take your time: wrong moves can be retried, but only a clean solve within the target time counts as solved.
-      </p>
       {puzzles.length > 0 ? (
         <Drill
-          weaknessKeys={[weaknessKey]}
+          weaknessKey={weaknessKey}
           profileKey={profileKey}
           initial={puzzles.map((p) => clientPuzzle(p, ctx.settings, level))}
           engineDefault={ctx.settings.engineOnBoard}

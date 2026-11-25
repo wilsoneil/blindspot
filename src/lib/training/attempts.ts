@@ -8,7 +8,8 @@ import type { Settings } from "../settings";
 import { targetTimeMs } from "./play";
 import { updateReview, type ReviewChange } from "./review";
 
-export const MODES = ["drill", "rush", "survival", "blindspot"] as const;
+// ("blindspot" was a fourth mode until Nov 2026; the database still allows it for old rows.)
+export const MODES = ["drill", "rush", "survival"] as const;
 export type Mode = (typeof MODES)[number];
 
 /** Longest solve time stored: a puzzle left open for hours isn't a real solve time. */

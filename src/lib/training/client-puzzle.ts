@@ -10,7 +10,7 @@ export interface ClientPuzzle {
   moves: string[];
   rating: number; // for own positions, a stand-in from how subtle the move is
   targetMs: number;
-  /** Blindspot mode: a past failure or slow solve, back for review. */
+  /** Rush / Survival: a past failure or slow solve, back for review. */
   review?: boolean;
   /** A "find the move" position from the user's own game. */
   position?: PositionDetails;
