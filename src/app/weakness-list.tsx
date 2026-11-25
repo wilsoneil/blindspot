@@ -41,6 +41,7 @@ export function WeaknessList({ profile, shown }: { profile: StoredProfile; shown
       {top.some((w) => trainingSource(w.labels).kind === "puzzles") && (
         <div className="modes">
           <span className="small muted">All your top weaknesses, mixed:</span>
+          <Link className="button" href={`/train/blindspot?tc=${encodeURIComponent(profile.profileKey)}`}>Blindspot</Link>
           <Link className="button" href={`/train/rush?tc=${encodeURIComponent(profile.profileKey)}`}>Rush</Link>
           <Link className="button" href={`/train/survival?tc=${encodeURIComponent(profile.profileKey)}`}>Survival</Link>
         </div>

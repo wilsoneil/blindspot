@@ -10,10 +10,13 @@ export interface ClientPuzzle {
   moves: string[];
   rating: number;
   targetMs: number;
+  /** Blindspot mode: a past failure or slow solve, back for review. */
+  review?: boolean;
 }
 
-export function clientPuzzle(p: TrainingPuzzle, settings: Settings, level: number): ClientPuzzle {
+export function clientPuzzle(p: TrainingPuzzle & { review?: boolean }, settings: Settings, level: number): ClientPuzzle {
   return {
+    ...(p.review ? { review: true } : {}),
     id: p.id,
     fen: p.fen,
     moves: p.moves,

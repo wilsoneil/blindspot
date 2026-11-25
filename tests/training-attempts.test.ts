@@ -87,7 +87,7 @@ describe("recordPuzzleAttempt", () => {
   it("counts wrong moves, reveals and slow solves as not fully solved", async () => {
     const { db } = setup();
     const wrong = await recordPuzzleAttempt(db, USER, DEFAULT_SETTINGS, input({ wrongMoves: 2 }), 1500);
-    expect(wrong).toMatchObject({ correct: false, fullySolved: false });
+    expect(wrong).toMatchObject({ correct: false, fullySolved: false, review: { kind: "added" } });
     const revealed = await recordPuzzleAttempt(db, USER, DEFAULT_SETTINGS, input({ puzzleId: "bbbbb", revealed: true, solved: false }), 1500);
     expect(revealed).toMatchObject({ correct: false, fullySolved: false });
     const slow = await recordPuzzleAttempt(db, USER, DEFAULT_SETTINGS, input({ solveMs: 31_000 }), 1500);

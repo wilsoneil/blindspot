@@ -6,6 +6,7 @@
 import type { Db } from "../db";
 import type { Settings } from "../settings";
 import { targetTimeMs } from "./play";
+import { updateReview, type ReviewChange } from "./review";
 
 export const MODES = ["drill", "rush", "survival", "blindspot"] as const;
 export type Mode = (typeof MODES)[number];
@@ -37,6 +38,8 @@ export interface AttemptOutcome {
   fullySolved: boolean;
   targetMs: number;
   session: { attempted: number; solved: number };
+  /** What happened to the puzzle's place on the review queue. */
+  review: ReviewChange;
 }
 
 export class AttemptError extends Error {}
@@ -115,5 +118,7 @@ export async function recordPuzzleAttempt(
     .update({ ...session, ended_at: new Date().toISOString() }).eq("id", sessionId);
   check(updErr, "update the training session");
 
-  return { sessionId, firstAttempt, correct, fullySolved, targetMs, session };
+  const review = await updateReview(db, userId, p.id, fullySolved);
+
+  return { sessionId, firstAttempt, correct, fullySolved, targetMs, session, review };
 }
