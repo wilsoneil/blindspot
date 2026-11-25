@@ -130,6 +130,8 @@ p { margin: 0 0 0.75rem; }
   color: var(--muted);
   font-size: 0.8rem;
 }
+/* A "find the move" position from the user's own game. */
+.pill.own { background: var(--accent); color: var(--accent-text); font-weight: 600; white-space: nowrap; }
 
 .check { color: var(--good); }
 .cross { color: var(--bad); }

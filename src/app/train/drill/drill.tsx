@@ -100,6 +100,7 @@ export function Drill({ weaknessKey, profileKey, initial, engineDefault }: {
         fen={puzzle.fen}
         moves={puzzle.moves}
         accepted={puzzle.position?.accepted}
+        tag={puzzle.position ? <span className="pill own" title="A position from one of your own games">Your game</span> : undefined}
         targetMs={puzzle.targetMs}
         onWrong="retry"
         allowReveal
@@ -121,23 +122,20 @@ export function Drill({ weaknessKey, profileKey, initial, engineDefault }: {
         </div>
       )}
       {message && <p className="small message-error" style={{ marginTop: "0.5rem" }}>{message}</p>}
-      <p className="small muted" style={{ marginTop: "0.75rem" }}>
-        {puzzle.position ? (
-          result ? (
-            <>
-              From your game on {new Date(puzzle.position.playedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}:
-              you played {puzzle.position.playedSan}; the engine&rsquo;s choice was {puzzle.position.bestSan}.
-            </>
-          ) : (
-            <>A position from one of your own games. Find the best move.</>
-          )
-        ) : (
-          <>
-            Lichess puzzle{" "}
-            <a href={`https://lichess.org/training/${puzzle.id}`} target="_blank" rel="noreferrer">{puzzle.id}</a>, rated {puzzle.rating}.
-          </>
-        )}
-      </p>
+      {puzzle.position ? (
+        // Afterwards, what happened in the game (the "Your game" tag marks it before then).
+        result && (
+          <p className="small muted" style={{ marginTop: "0.75rem" }}>
+            From your game on {new Date(puzzle.position.playedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}:
+            you played {puzzle.position.playedSan}; the engine&rsquo;s choice was {puzzle.position.bestSan}.
+          </p>
+        )
+      ) : (
+        <p className="small muted" style={{ marginTop: "0.75rem" }}>
+          Lichess puzzle{" "}
+          <a href={`https://lichess.org/training/${puzzle.id}`} target="_blank" rel="noreferrer">{puzzle.id}</a>, rated {puzzle.rating}.
+        </p>
+      )}
     </>
   );
 }
