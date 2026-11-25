@@ -19,7 +19,8 @@ const mistake = (gameId: number, labels: string[], drop = 0.3, phase = "phaseMid
   gameId, playedAt: daysAgo(age), drop, phase, labels: [phase, ...labels],
 });
 
-const opts = { halfLifeDays: 60, gamesWeightPct: 70, now: NOW, countPuzzles: async () => 1000 };
+// No motif counts: every tactic is equally common, so these tests don't depend on the Lichess file.
+const opts = { halfLifeDays: 60, gamesWeightPct: 70, now: NOW, countPuzzles: async () => 1000, motifFrequency: {} };
 
 describe("buildProfile", () => {
   it("ranks the costliest category first and scales severity 0-100", async () => {
@@ -143,6 +144,40 @@ describe("pairs", () => {
   });
 });
 
+describe("tactics and mates", () => {
+  // Forks are ten times as common as skewers among puzzles; the user misses both equally often.
+  const freq = { fork: 1000, skewer: 100, pin: 500 };
+  const m = [
+    ...Array.from({ length: 8 }, (_, i) => mistake(i + 1, ["fork:missed"], 0.3)),
+    ...Array.from({ length: 8 }, (_, i) => mistake(i + 11, ["skewer:missed"], 0.3)),
+  ];
+
+  it("are compared with how common each motif is", async () => {
+    const p = await buildProfile(games(40), m, { ...opts, motifFrequency: freq });
+    const score = (k: string) => p.all.find((e) => e.key === k)!.score;
+    // As many skewer mistakes as fork mistakes is unusual: skewers are the weakness.
+    expect(score("skewer:missed")).toBeGreaterThan(score("fork:missed"));
+  });
+
+  it("score equally when the motifs are equally common", async () => {
+    const p = await buildProfile(games(40), m, { ...opts, motifFrequency: { fork: 100, skewer: 100 } });
+    const score = (k: string) => p.all.find((e) => e.key === k)!.score;
+    expect(score("skewer:missed")).toBeCloseTo(score("fork:missed"), 6);
+  });
+
+  it("score alike when the mistakes follow the motifs' usual shares", async () => {
+    // Forks twice as common as pins in puzzles, and the user's mistakes split 2:1 the same way.
+    // Many games, so the small-sample pull towards 1 hardly matters.
+    const split = [
+      ...Array.from({ length: 40 }, (_, i) => mistake(i + 1, ["fork:missed"], 0.3)),
+      ...Array.from({ length: 20 }, (_, i) => mistake(i + 101, ["pin:missed"], 0.3)),
+    ];
+    const p = await buildProfile(games(2000), split, { ...opts, motifFrequency: { fork: 200, pin: 100 } });
+    const score = (k: string) => p.all.find((e) => e.key === k)!.score;
+    expect(score("fork:missed") / score("pin:missed")).toBeCloseTo(1, 1);
+  });
+});
+
 describe("review (profile check page)", () => {
   const g = games(40, ["phaseEndgame"]);
   const m = [
@@ -195,5 +230,13 @@ describe("names", () => {
     expect(describeKey("shortMate:missed")).toBe("Short mates in 1–2 (missed)");
     expect(describeKey("longMate:allowed")).toBe("Mates in 3 or more (allowed)");
     expect(describeKey("phaseEndgame+shortMate:missed")).toBe("Short mates in 1–2 (missed) in the endgame");
+  });
+});
+
+describe("motif counts", () => {
+  it("cover every tactic and mate", async () => {
+    const { MOTIF_PUZZLES } = await import("../src/lib/analysis/motif-frequency");
+    const { LABELS } = await import("../src/lib/labels");
+    for (const l of LABELS.filter((x) => x.missedAllowed)) expect(MOTIF_PUZZLES[l.id]).toBeGreaterThan(0);
   });
 });

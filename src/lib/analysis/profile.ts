@@ -7,11 +7,14 @@
 //   3. Weight it by recency: exponential decay with the half-life from settings.
 //   4. Normalise by exposure: mistakes per game in which the situation arose, compared with
 //      the user's average for that family of labels (e.g. one tactic against all tactics).
+//      Tactics and mates arise in any game, so their exposure is weighted by how common each
+//      motif is among Lichess puzzles (motif-frequency.ts).
 //   5. Require evidence: small samples are pulled towards the average, and a category needs
 //      mistakes in at least three distinct games to enter the top list.
 // Then blend with puzzle performance (from Phase 3) and scale 0-100 against each other.
 
 import { describeLabelKey, familyOfKey, LABELS, puzzleLabelForKey } from "../labels";
+import { MOTIF_PUZZLES } from "./motif-frequency";
 import { assignOpenings, describeOpening, type GameOpening } from "./openings";
 
 export const MIN_GAMES = 3; // distinct games before a category can enter the top list
@@ -50,6 +53,11 @@ export interface ProfileOptions {
   puzzleScores?: Map<string, number>;
   /** How many stored Lichess puzzles carry all these puzzle-store labels. */
   countPuzzles: (labels: string[]) => Promise<number>;
+  /**
+   * How often each tactic and mate appears among Lichess puzzles (label id -> count), for the
+   * exposure of tactics and mates. Defaults to the counts from the full Lichess file.
+   */
+  motifFrequency?: Record<string, number>;
   /** Also return `review`: why each pair was or wasn't used, and how each family fares (the profile check page). */
   review?: boolean;
 }
@@ -142,6 +150,27 @@ interface Stats {
 
 const newStats = (): Stats => ({ cost: 0, exposure: 0, mistakes: 0, games: new Set() });
 
+/**
+ * Each tactic or mate key's exposure as a multiple of all games: its share of its family's
+ * puzzle count, times the number of keys in the family (so the family's total is unchanged,
+ * and equal counts give every key 1, the old "any game" exposure).
+ */
+function tacticShares(freq: Record<string, number>): (key: string) => number {
+  const known = (k: string) => freq[k.split(":")[0]] ?? 0;
+  const byFamily = new Map<string, string[]>();
+  for (const k of TACTIC_KEYS) byFamily.set(familyOfKey(k), [...(byFamily.get(familyOfKey(k)) ?? []), k]);
+  const share = new Map<string, number>();
+  for (const keys of byFamily.values()) {
+    const counted = keys.filter((k) => known(k) > 0);
+    // A motif missing from the counts is taken as average for its family; no counts at all = all equal.
+    const fill = counted.length ? counted.reduce((n, k) => n + known(k), 0) / counted.length : 1;
+    const count = (k: string) => (known(k) > 0 ? known(k) : fill);
+    const total = keys.reduce((n, k) => n + count(k), 0);
+    for (const k of keys) share.set(k, (keys.length * count(k)) / total);
+  }
+  return (k) => share.get(k) ?? 1;
+}
+
 /** Display name of any key, including openings and pairs. */
 export function describeKey(key: string): string {
   if (key.includes("+")) {
@@ -205,7 +234,11 @@ export async function buildProfile(games: ProfileGame[], mistakes: ProfileMistak
     allGames += w;
     for (const s of new Set([...g.situations, openingOf.get(g.id)!])) get(s).exposure += w;
   }
-  for (const k of TACTIC_KEYS) get(k).exposure = allGames; // a tactic can turn up in any game
+  // A tactic can turn up in any game, but some motifs far more often than others. Each gets
+  // its usual share of the family's games, from how often it appears among Lichess puzzles
+  // (taken from real games), so a common motif isn't a weakness just for being common.
+  const motifShare = tacticShares(o.motifFrequency ?? MOTIF_PUZZLES);
+  for (const k of TACTIC_KEYS) get(k).exposure = allGames * motifShare(k);
 
   // Mistakes, and every pair of labels on the same mistake.
   const known = new Set(games.map((g) => g.id));
