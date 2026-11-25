@@ -32,6 +32,7 @@ Update this section when a phase is finished.
 - **Later, openings:** opening weaknesses are trained by Lichess `OpeningTags` (`src/lib/training/openings.ts`) but still not paired with other labels; pairing (e.g. forks in the Italian) would need `countPuzzles` to count by tag too.
 - **Phase 3, positional pairs:** a pair with a positional label (e.g. pawn decisions in the transition) counts the user's own mistakes as its "puzzles", so it rarely reaches 200. Revisit the 200 rule for those once real numbers exist.
 - **Keep an eye on:** each label is scored against its own family, so families with many labels (tactics) can reach higher scores than small ones (phases, position states). The first real profile was acceptable, but its top five were all tactics or mates (two paired with the endgame).
+- **Later, Rush length:** Rush is fixed at 5 minutes (`RUSH_MINUTES`). Bringing back a 3/5/10-minute choice needs a migration so `training_sessions` records each run's length, and `runStats` comparing like with like. The old `settings.rush_minutes` column is unused.
 - **After that:** consider a quarterly automatic puzzle rebuild (a `schedule` in `.github/workflows/build-puzzles.yml`, like the daily import), to pick up Lichess's monthly updates.
 
 ## How to work

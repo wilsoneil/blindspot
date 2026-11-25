@@ -75,14 +75,6 @@ export function SettingsForm({ settings: s, timeControls }: { settings: Settings
           </select>
         </div>
         <div className="field">
-          <label htmlFor="rushMinutes">Rush length</label>
-          <select id="rushMinutes" name="rushMinutes" defaultValue={s.rushMinutes}>
-            <option value={3}>3 minutes</option>
-            <option value={5}>5 minutes</option>
-            <option value={10}>10 minutes</option>
-          </select>
-        </div>
-        <div className="field">
           <label htmlFor="survivalLives">Survival lives</label>
           <input id="survivalLives" name="survivalLives" type="number" min={1} max={5} defaultValue={s.survivalLives} />
         </div>

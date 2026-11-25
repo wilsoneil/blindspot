@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 25 Nov 2026 (reviews: every due review considered, oldest first)
+Last updated: 25 Nov 2026 (Rush fixed at 5 minutes; length setting removed)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -123,10 +123,10 @@ Three modes, all drawing only on puzzles matched to the weakness profile. Drill 
 | Mode | Puzzles from | Format | Mistakes |
 | --- | --- | --- | --- |
 | Drill | One chosen weakness | Timed and logged, own pace | Unlimited retries, reveal solution, analysis board |
-| Rush | All top weaknesses, shuffled, plus due reviews | As many as possible in 5 minutes (setting), rising difficulty | A wrong move ends that puzzle, no retry; three failed puzzles end the run |
+| Rush | All top weaknesses, shuffled, plus due reviews | As many as possible in 5 minutes (fixed), rising difficulty | A wrong move ends that puzzle, no retry; three failed puzzles end the run |
 | Survival | All top weaknesses, shuffled, plus due reviews | Open-ended, rising difficulty | A wrong move ends that puzzle; three failed puzzles (setting) end the run |
 
-- **Run stats** (Rush and Survival): the start page shows the best score ever, the best this week, the last run's score and runs played; a run's score is puzzles solved correctly (time doesn't matter in a run), and the end screen marks a new best. Rush scores from different clock lengths (setting) are pooled.
+- **Run stats** (Rush and Survival): the start page shows the best score ever, the best this week, the last run's score and runs played; a run's score is puzzles solved correctly (time doesn't matter in a run), and the end screen marks a new best. Rush is always 5 minutes, so its scores compare; the 3/5/10-minute setting was removed in Nov 2026 (see "Later").
 - **Rising difficulty** (Rush and Survival): each run is a ladder that starts 300 points below the user's Blindspot rating and rises 25 points per puzzle. Puzzles come in groups of six, each taking two from each of the next three weaknesses in turn (in a random order per run), easiest first within the group. A puzzle not finished when Rush's clock runs out isn't logged.
 - Failed or slow puzzles return in later Rush and Survival runs on a spaced-repetition schedule: due again after 1, then 3, 7 and 21 days. A clean solve (correct within target time) of a puzzle that is due moves it to the next step (a clean solve before it's due, such as an immediate retry, doesn't), and one after the 21-day step leaves the schedule; a failure or slow solve in any mode sends it back to 1 day. Due reviews make up at most a third of a run (two in each group of six), so new puzzles keep coming; each goes in the group whose difficulty matches its rating, and one harder than the run has reached yet waits until it gets there. A run looks through every due review and gives the places to the oldest that fit, so a backlog of hard misses never hides easier ones. Reviews missed while away stay due until played, and the next interval counts from when the puzzle is actually played.
 - **Positional weaknesses** (transition, pawn decisions, other computed labels with no Lichess theme) use "find the move" positions from the user's own games: open format, no multiple choice, and any move within a small margin of Stockfish's best is accepted. The accepted moves are worked out in advance by the analysis job (Stockfish's top five moves at the analysis node budget, kept if they are within 3 points of winning chance of the best), so the browser needs no engine to mark an answer. Drill serves them when that weakness is chosen; the mixed modes include them alongside Lichess puzzles, with difficulty approximated by how subtle the best move is: the fewer moves are accepted and the larger the gap to the next-best move, the harder the position (subtlety 0–1: the gap in winning chance to the first rejected move, full at 30 points, times 1, 0.75 or 0.5 for one, two or more accepted moves). For ordering among Lichess puzzles, a position counts as rated from 400 below the user's Blindspot rating (subtlety 0) to 400 above (subtlety 1). Positions already trained aren't served again except as reviews; misses join the same review queue as puzzles. They count towards each run's score but never towards the Blindspot rating, and are tracked separately as accuracy and speed.
@@ -163,7 +163,6 @@ One settings page holds every adjustable choice; defaults are what the spec desc
 | Recency half-life | 60 days | 14–365 days |
 | Analysis history window | Last 12 months | 3 months to all games |
 | Target solve time | 15 s per move to play, +50% for puzzles well above the user's level | Stricter (×0.75), normal or looser (×1.5) |
-| Rush length | 5 minutes | 3, 5 or 10 minutes |
 | Survival lives | 3 | 1–5 |
 | Engine on analysis board | Off | On / off |
 | Theme | Slate | Slate, Tournament, Paper |
@@ -217,6 +216,6 @@ Version 1 is phases 1–5; nothing is trainable until the analysis runs.
 4. **Progress:** showing the Blindspot rating, Blitz gap, theme ratings, charts. (The daily import schedule was switched on early, in Phase 1.)
 5. **AI explanations:** an on-demand Explain button after a puzzle and on the analysis board. Stockfish and code establish the facts (the line, what is attacked, what the move fixes); the AI only puts them into words and never judges the position itself. Positional weaknesses first. Cost controls: prepaid provider credits with auto top-up off (hard cap); an in-app monthly budget and daily limit set in settings; a usage panel showing explanations and estimated spend this month; each position's explanation cached so repeats are free; a small, cheap model by default.
 
-**Later:** opening up to multiple users; mining unseen positional positions from Lichess games as a fairer test of positional training.
+**Later:** opening up to multiple users; mining unseen positional positions from Lichess games as a fairer test of positional training; possibly bringing back a choice of Rush length (3, 5 or 10 minutes), which needs a database change so each run records its length and the run stats compare like with like (the old `settings.rush_minutes` column is still there, unused).
 
 **Out of scope:** random or free-choice puzzles, own-game positions outside the positional drills, a time-trouble category, app store release.
