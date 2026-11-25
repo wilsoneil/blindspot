@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 25 Nov 2026 (Phase 3 decisions: target time, repetition schedule, accepted moves, rating calculated from Phase 3)
+Last updated: 25 Nov 2026 (Phase 3: how the Blindspot rating is calculated)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -143,7 +143,7 @@ Every attempt logs the result and the time taken; both feed the weakness score a
 
 The home screen leads with the Blindspot rating as the primary number, with the Blitz gap shown smaller beneath it; each has a line chart over the last week, month and all time.
 
-- **Blindspot rating:** one overall Glicko-2 rating across all rated Lichess puzzles attempted in the app (first attempts only). It only rises for solves that are correct and within target time.
+- **Blindspot rating:** one overall Glicko-2 rating across all rated Lichess puzzles attempted in the app (first attempts only). It only rises for solves that are correct and within target time. Each attempt is its own rating period against the puzzle's Lichess rating at the time (with a fixed deviation of 80, since stored puzzles have settled ratings); it starts at 1500 (deviation 350, volatility 0.06, τ 0.5) and the deviation never drops below 45, so it keeps responding. It is worked out by replaying the first attempts in order, so its full history can always be rebuilt. Puzzles are chosen around it, and it sets the "well above the user's level" part of the target time.
 - **Blitz gap:** daily rating minus blitz rating, from chess.com ratings fetched daily and smoothed as a 30-day average so a single bad session doesn't swing it. Shown in points, for example "600 and falling"; falling = closing the gap. Show both underlying ratings in small print.
 - Underneath: a rating per weakness theme (leading indicator) and each weakness score's trend from games (lagging indicator, showing whether training carries over to real play)
 
@@ -210,7 +210,7 @@ Version 1 is phases 1–5; nothing is trainable until the analysis runs.
 
 1. **Foundations:** Next.js app replacing the hello-world page, Vercel deploy, Supabase database and schema (per-user from day one), login (Supabase Auth, allowlist), theme system, settings page skeleton, chess.com import, filtered puzzle store.
 2. **Analysis:** Stockfish job, mistake tagging, weakness profiles; run the 12-month backlog. Milestone: the user can see their weakness profile from real games.
-3. **Training:** puzzle board, the four modes, attempt logging, analysis board with optional engine, positional "find the move" drills. The Blindspot rating is calculated and stored from this phase, because rising difficulty and adaptive selection need it; it isn't shown until Phase 4.
+3. **Training:** puzzle board, the four modes, attempt logging, analysis board with optional engine, positional "find the move" drills. The Blindspot rating is calculated from this phase, because rising difficulty and adaptive selection need it; it isn't shown until Phase 4.
 4. **Progress:** showing the Blindspot rating, Blitz gap, theme ratings, charts. (The daily import schedule was switched on early, in Phase 1.)
 5. **AI explanations:** an on-demand Explain button after a puzzle and on the analysis board. Stockfish and code establish the facts (the line, what is attacked, what the move fixes); the AI only puts them into words and never judges the position itself. Positional weaknesses first. Cost controls: prepaid provider credits with auto top-up off (hard cap); an in-app monthly budget and daily limit set in settings; a usage panel showing explanations and estimated spend this month; each position's explanation cached so repeats are free; a small, cheap model by default.
 

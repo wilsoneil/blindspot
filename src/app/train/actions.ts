@@ -10,7 +10,8 @@ import { getDb, type Db } from "@/lib/db";
 import { settingsFromRow, type Settings, type SettingsRow } from "@/lib/settings";
 import { AttemptError, recordPuzzleAttempt, type AttemptInput, type AttemptOutcome } from "@/lib/training/attempts";
 import { clientPuzzle, type ClientPuzzle } from "@/lib/training/client-puzzle";
-import { DEFAULT_LEVEL, selectPuzzles, trainingSource } from "@/lib/training/select";
+import { puzzleLevel } from "@/lib/training/rating";
+import { selectPuzzles, trainingSource } from "@/lib/training/select";
 import { getUserIdForLogin } from "@/lib/user";
 
 type Signed = { db: Db; userId: string; settings: Settings };
@@ -31,7 +32,9 @@ export async function saveAttempt(input: AttemptInput): Promise<ActionResult<Att
   try {
     const ctx = await signedIn();
     if (!ctx) return { ok: false, message: "Please sign in again." };
-    const value = await recordPuzzleAttempt(ctx.db, ctx.userId, ctx.settings, input, DEFAULT_LEVEL);
+    // The level before this attempt: the one the puzzle was served at.
+    const level = await puzzleLevel(ctx.db, ctx.userId);
+    const value = await recordPuzzleAttempt(ctx.db, ctx.userId, ctx.settings, input, level);
     return { ok: true, value };
   } catch (e) {
     if (e instanceof AttemptError) return { ok: false, message: e.message };
@@ -47,10 +50,11 @@ export async function morePuzzles(weaknessKey: string, exclude: string[]): Promi
     if (!ctx) return { ok: false, message: "Please sign in again." };
     const source = trainingSource(weaknessKey.split("+"));
     if (source.kind !== "puzzles") return { ok: false, message: "This weakness can't be trained with Lichess puzzles yet." };
+    const level = await puzzleLevel(ctx.db, ctx.userId);
     const puzzles = await selectPuzzles(ctx.db, {
-      userId: ctx.userId, puzzleLabels: source.puzzleLabels, count: 5, exclude: exclude.slice(0, 500),
+      userId: ctx.userId, puzzleLabels: source.puzzleLabels, count: 5, level, exclude: exclude.slice(0, 500),
     });
-    return { ok: true, value: puzzles.map((p) => clientPuzzle(p, ctx.settings, DEFAULT_LEVEL)) };
+    return { ok: true, value: puzzles.map((p) => clientPuzzle(p, ctx.settings, level)) };
   } catch (e) {
     console.error("Loading puzzles failed", e);
     return { ok: false, message: "Couldn't load more puzzles." };
