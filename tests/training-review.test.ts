@@ -111,10 +111,26 @@ describe("reviews in Rush and Survival", () => {
     expect(got.some((p) => p.id === "old3")).toBe(false);
   });
 
-  it("puts reviews in the next group when one is full, and easy ones in the first group fetched", () => {
+  it("puts reviews in the next group when one is full, oldest first, and easy ones in the first group fetched", () => {
     const r = (id: string, rating: number) => ({ id, fen: "", moves: [], rating, themes: [], labels: [], review: true });
     const placed = placeReviews([r("a", 1250), r("b", 1260), r("c", 1270), r("d", 600)], 1500, 3, 2);
-    expect([...placed.entries()].map(([c, l]) => [c, l.map((x) => x.id)])).toEqual([[3, ["d", "a"]], [4, ["b", "c"]]]);
+    expect([...placed.entries()].map(([c, l]) => [c, l.map((x) => x.id)])).toEqual([[3, ["a", "b"]], [4, ["c", "d"]]]);
+  });
+
+  it("still finds an easier due review behind a backlog of older, harder ones", async () => {
+    const hard = Array.from({ length: 30 }, (_, i) => puzzle(`hard${i}`, ["skewer"], 2400));
+    const easy = puzzle("easy", ["skewer"], 1250);
+    const backlog = [...hard, easy].map((p, i) => ({
+      id: 100 + i, user_id: "u1", puzzle_id: p.id, mistake_id: null, step: 0, due_at: days(-40 + i).toISOString(),
+    }));
+    const { db } = fakeDb({
+      puzzles: [...puzzles, ...hard, easy], review_queue: backlog,
+      puzzle_attempts: backlog.map((q) => ({ id: q.id, user_id: "u1", puzzle_id: q.puzzle_id })),
+    });
+    const got = await selectRunPuzzles(db, {
+      userId: "u1", weaknesses: [W("fork"), W("pin")], level: 1500, fromChunk: 0, chunks: 2, now: NOW,
+    });
+    expect(got.filter((p) => p.review).map((p) => p.id)).toEqual(["easy"]);
   });
 
   it("skips reviews already served in this run", async () => {

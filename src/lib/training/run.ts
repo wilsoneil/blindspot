@@ -19,10 +19,12 @@ export const CHUNK = 6;
 const PER_WEAKNESS = 2;
 /** At most a third of a run is reviews, so a long review queue never crowds out new puzzles. */
 export const REVIEWS_PER_CHUNK = 2;
+/** How many due reviews a run looks through (all of them, in practice). */
+export const MAX_DUE_REVIEWS = 500;
 
 export type RunPuzzle = TrainingPuzzle & { review?: boolean };
 
-/** Puzzles and own positions due for review now (not already in this run). */
+/** Puzzles and own positions due for review now (not already in this run), oldest due first. */
 export async function loadDueReviews(
   db: Pick<Db, "from">, userId: string, o: { limit: number; level: number; exclude?: Set<string>; now?: Date },
 ): Promise<RunPuzzle[]> {
@@ -31,6 +33,7 @@ export async function loadDueReviews(
   const puzzleIds = due.flatMap((r) => ("puzzleId" in r ? [r.puzzleId] : []));
   const mistakeIds = due.flatMap((r) => ("mistakeId" in r ? [r.mistakeId] : []));
   const out: RunPuzzle[] = [];
+  const order = new Map(due.map((r, i) => ["puzzleId" in r ? r.puzzleId : `m${r.mistakeId}`, i]));
   if (puzzleIds.length) {
     const { data, error } = await db.from("puzzles").select("id, fen, moves, rating, themes, labels").in("id", puzzleIds);
     if (error) throw new Error(`Could not read review puzzles: ${error.message}`);
@@ -47,7 +50,7 @@ export async function loadDueReviews(
       if (m.accepted_moves?.length) out.push({ ...positionFromMistake(m, o.level), review: true });
     }
   }
-  return out;
+  return out.sort((a, b) => order.get(a.id)! - order.get(b.id)!);
 }
 
 /** The rating the ladder aims at for puzzle number i (from 0). */
@@ -80,9 +83,9 @@ export async function selectRunPuzzles(db: Pick<Db, "from">, o: RunSelect): Prom
   if (o.weaknesses.length === 0) return [];
   const attempted = await attemptedPuzzleIds(db, o.userId);
   const taken = new Set(o.exclude ?? []);
-  const reviews = await loadDueReviews(db, o.userId, {
-    limit: REVIEWS_PER_CHUNK * o.chunks * 3, level: o.level, exclude: taken, now: o.now,
-  });
+  // Every due review, so ones that fit this part of the ladder are found even behind a
+  // backlog of harder ones the run hasn't reached.
+  const reviews = await loadDueReviews(db, o.userId, { limit: MAX_DUE_REVIEWS, level: o.level, exclude: taken, now: o.now });
   const byChunk = placeReviews(reviews, o.level, o.fromChunk, o.chunks);
   const out: RunPuzzle[] = [];
   for (let c = o.fromChunk; c < o.fromChunk + o.chunks; c++) {
@@ -117,14 +120,14 @@ export function chunkForRating(level: number, rating: number, from: number): num
 }
 
 /**
- * Places reviews in the chunks being fetched: each in the chunk matching its rating (easier
- * ones in the first), at most REVIEWS_PER_CHUNK per chunk, spilling into the next chunk when
- * one is full. Reviews harder than every chunk fetched now wait for a later fetch.
+ * Places reviews (oldest due first) in the chunks being fetched: each in the chunk matching
+ * its rating (easier ones in the first), at most REVIEWS_PER_CHUNK per chunk, spilling into
+ * the next chunk when one is full, so the oldest that fit get the places. Reviews harder
+ * than every chunk fetched now wait for a later fetch.
  */
 export function placeReviews(reviews: RunPuzzle[], level: number, from: number, chunks: number): Map<number, RunPuzzle[]> {
   const out = new Map<number, RunPuzzle[]>();
-  const sorted = [...reviews].sort((a, b) => a.rating - b.rating);
-  for (const r of sorted) {
+  for (const r of reviews) {
     for (let c = chunkForRating(level, r.rating, from); c < from + chunks; c++) {
       const list = out.get(c) ?? [];
       if (list.length < REVIEWS_PER_CHUNK) {
