@@ -38,6 +38,13 @@ export function WeaknessList({ profile, shown }: { profile: StoredProfile; shown
           </li>
         ))}
       </ol>
+      {top.some((w) => trainingSource(w.labels).kind === "puzzles") && (
+        <div className="modes">
+          <span className="small muted">All your top weaknesses, mixed:</span>
+          <Link className="button" href={`/train/rush?tc=${encodeURIComponent(profile.profileKey)}`}>Rush</Link>
+          <Link className="button" href={`/train/survival?tc=${encodeURIComponent(profile.profileKey)}`}>Survival</Link>
+        </div>
+      )}
       {top.length < shown && (
         <p className="small muted">
           Only {top.length} {top.length === 1 ? "area has" : "areas have"} enough evidence so far (mistakes in at least three games).

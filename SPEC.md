@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 25 Nov 2026 (Phase 3: puzzle scores in the weakness blend)
+Last updated: 25 Nov 2026 (Phase 3: rising difficulty in Rush and Survival)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -125,6 +125,7 @@ Four modes, all drawing only on puzzles matched to the weakness profile. Only Dr
 | Survival | All top weaknesses, shuffled | Open-ended, rising difficulty | Three mistakes (setting) ends the run |
 | Blindspot | All top weaknesses, shuffled, unlabelled, plus past failures and slow solves | Timed and logged, own pace | As Drill |
 
+- **Rising difficulty** (Rush and Survival): each run is a ladder that starts 300 points below the user's Blindspot rating and rises 25 points per puzzle. Puzzles come in groups of six, each taking two from each of the next three weaknesses in turn (in a random order per run), easiest first within the group. A puzzle not finished when Rush's clock runs out isn't logged.
 - Failed or slow puzzles return in later Blindspot sessions on a spaced-repetition schedule: due again after 1, then 3, 7 and 21 days. A clean solve (correct within target time) moves a puzzle to the next step, and one after the 21-day step leaves the schedule; a failure or slow solve sends it back to 1 day.
 - **Positional weaknesses** (transition, pawn decisions, other computed labels with no Lichess theme) use "find the move" positions from the user's own games: open format, no multiple choice, and any move within a small margin of Stockfish's best is accepted. The accepted moves are worked out in advance by the analysis job (Stockfish's top few moves, kept if they lose little winning chance against the best), so the browser needs no engine to mark an answer. Drill serves them when that weakness is chosen; the mixed modes include them alongside Lichess puzzles, with difficulty approximated by how subtle the best move is: the fewer moves are accepted and the larger the gap to the next-best move, the harder the position. They count towards each run's score but never towards the Blindspot rating, and are tracked separately as accuracy and speed.
 
