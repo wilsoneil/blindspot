@@ -82,8 +82,11 @@ async function main() {
   }
 
   if (db) {
-    const removed = await removeUnselected(db, keptIds);
+    const { removed, keptForAttempts } = await removeUnselected(db, keptIds);
     console.log(`Removed ${removed.toLocaleString()} stored puzzles this run didn't select.`);
+    if (keptForAttempts) {
+      console.log(`Kept ${keptForAttempts.toLocaleString()} unselected puzzles because they have attempts.`);
+    }
   }
 
   console.log(`\nDone in ${Math.round((Date.now() - started) / 1000)}s: ${filter.seen.toLocaleString()} read, ${filter.kept.toLocaleString()} kept${dryRun ? " (dry run, nothing saved)" : ""}.`);
