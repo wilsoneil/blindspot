@@ -1,6 +1,8 @@
 // The top-weaknesses list on the home page.
 
+import Link from "next/link";
 import { describeKey } from "@/lib/analysis/profile";
+import { trainingSource } from "@/lib/training/select";
 import type { StoredProfile } from "@/lib/weakness-store";
 
 export const formatDate = (iso: string) =>
@@ -16,6 +18,15 @@ export function WeaknessList({ profile, shown }: { profile: StoredProfile; shown
             <div className="weakness-head">
               {/* Named from the key, so a wording change shows without waiting for the next rebuild. */}
               <span className="weakness-name">{describeKey(w.key)}</span>
+              {trainingSource(w.labels).kind === "puzzles" && (
+                <Link
+                  className="drill-link"
+                  href={`/train/drill?w=${encodeURIComponent(w.key)}&tc=${encodeURIComponent(profile.profileKey)}`}
+                  aria-label={`Drill ${describeKey(w.key)}`}
+                >
+                  Drill
+                </Link>
+              )}
               <span className="weakness-score" aria-label={`Severity ${w.severity} out of 100`}>{w.severity}</span>
             </div>
             <div className="bar" aria-hidden="true">
@@ -34,7 +45,8 @@ export function WeaknessList({ profile, shown }: { profile: StoredProfile; shown
       )}
       <p className="small muted" style={{ marginBottom: 0 }}>
         From {profile.gamesAnalysed.toLocaleString()} analysed games and {profile.mistakes.toLocaleString()} mistakes;
-        updated {formatDate(profile.computedAt)}. Severity is relative: 100 is your weakest area. Training arrives in Phase 3.
+        updated {formatDate(profile.computedAt)}. Severity is relative: 100 is your weakest area.
+        Tap Drill to train one; weaknesses without it are trained with positions from your own games, which arrive in a later step.
       </p>
     </>
   );
