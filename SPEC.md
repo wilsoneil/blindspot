@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 25 Nov 2026 ("Your game" tag on own positions)
+Last updated: 25 Nov 2026 (allowed weaknesses: own positions and Lichess puzzles, 1:1)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -87,6 +87,7 @@ Categories come from a fixed list; every one maps to a Lichess puzzle filter (or
 | Position state | Converting an advantage, defending a worse position, balanced | Computed from evaluation; defending is also trained with Lichess "equality" puzzles |
 
 - **Missed** = the user had the tactic and didn't play it. **Allowed** = the user's move let the opponent play it.
+- **Training an allowed weakness** alternates the user's own positions with Lichess puzzles, one of each in turn: a Lichess puzzle always puts the user on the side playing the tactic (recognising it), while their own positions, from the mistakes behind that weakness, ask for the move that doesn't allow it. Once the own positions have all been trained, puzzles carry on alone (misses come back as reviews). Missed weaknesses use Lichess puzzles only.
 - **Only real tactics are tagged:** the line the tagger sees (cut to puzzle length) must win material or mate; one that doesn't is a positional mistake and gets no tactical tag (it still counts under phase, endgame type, move type and position state). Before Nov 2026 such lines were tagged "defensive move", a catch-all that inflated that label, especially in daily games.
 - **Defensive move (allowed)** is never scored: letting the opponent play a good defensive move isn't something a puzzle can train. Defensive move (missed), needing a defensive move and not finding it, is.
 - Not used as weaknesses: Lichess goals, puzzle lengths and origins (used only for puzzle selection). The one exception: the "equality" goal (hold a draw from a worse position) supplies puzzles for "defending a worse position". "Advantage" and "crushing" describe what a puzzle's solution wins, not an already-won position, so they don't train "converting". Adding a label later should be a small change.

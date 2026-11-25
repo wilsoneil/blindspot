@@ -85,7 +85,7 @@ describe("mixedWeaknesses", () => {
     expect(mixedWeaknesses(top, 4)).toEqual([
       { key: "fork:missed", kind: "puzzles", puzzleLabels: ["fork"] },
       { key: "phaseTransition", kind: "ownGames", labelKeys: ["phaseTransition"] },
-      { key: "pin:allowed+rookEndgame", kind: "puzzles", puzzleLabels: ["pin", "rookEndgame"] },
+      { key: "pin:allowed+rookEndgame", kind: "puzzles", puzzleLabels: ["pin", "rookEndgame"], ownLabelKeys: ["pin:allowed", "rookEndgame"] },
     ]);
   });
 });
