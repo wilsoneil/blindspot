@@ -22,7 +22,7 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 9. Blindspot mode and the review queue: **done** (`src/lib/training/review.ts`); Blindspot mode later dropped at the user's request, and due reviews now go into Rush and Survival (`src/lib/training/run.ts`)
 10. Positional "find the move" drills (analysis job stores accepted moves and subtlety; backfill): **done** (`scripts/find-moves.ts`, `src/lib/training/positions.ts`)
 11. Openings: chess.com names to Lichess `OpeningTags`: **done** (`src/lib/training/openings.ts`; GIN index on `opening_tags` in migration 0006)
-12. Review: positional pairs' 200 rule, tactics dominance; mark Phase 3 done
+12. Review: positional pairs' 200 rule, tactics dominance; mark Phase 3 done. **In progress:** the read-only profile check page (`/settings/profile-check`, `review: true` in `buildProfile`) shows the real numbers; next, decide the rule changes from it
 
 Update this section when a phase is finished.
 

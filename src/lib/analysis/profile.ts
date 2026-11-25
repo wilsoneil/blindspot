@@ -50,6 +50,8 @@ export interface ProfileOptions {
   puzzleScores?: Map<string, number>;
   /** How many stored Lichess puzzles carry all these puzzle-store labels. */
   countPuzzles: (labels: string[]) => Promise<number>;
+  /** Also return `review`: why each pair was or wasn't used, and how each family fares (the profile check page). */
+  review?: boolean;
 }
 
 export interface WeaknessEntry {
@@ -72,6 +74,50 @@ export interface Profile {
   all: WeaknessEntry[];
   gamesAnalysed: number;
   mistakes: number;
+  /** Only when asked for (`review: true`); never saved. */
+  review?: ProfileReview;
+}
+
+/** What happened to a pair with enough games: the first rule it failed, or how it fared. */
+export type PairOutcome =
+  | "shown" // replaces its broader label in the top list
+  | "parentNotInTop" // its broader label isn't near the top, so it couldn't matter
+  | "notClearlyWorse" // lift below PAIR_MIN_LIFT
+  | "fewPositions" // fewer than PAIR_MIN_PUZZLES puzzles (or own positions)
+  | "anotherPairBetter" // another pair scored higher for the same broader label
+  | "pairLimit" // passed, but MAX_PAIRS stronger pairs were already in
+  | "outOfTop"; // passed, but still not high enough for the top list
+
+export interface PairCheck {
+  key: string;
+  name: string;
+  /** The broader label it would replace. */
+  parent: string;
+  games: number;
+  mistakes: number;
+  lift: number;
+  score: number;
+  /** True when one label has no Lichess theme, so its "puzzles" are the user's own mistakes. */
+  positional: boolean;
+  /** Matching Lichess puzzles, or own positions for a positional pair. */
+  positions: number;
+  outcome: PairOutcome;
+}
+
+export interface FamilyCheck {
+  family: string;
+  /** Categories in the family (everything scored, even with no mistakes). */
+  labels: number;
+  /** Categories with mistakes in at least MIN_GAMES games. */
+  eligible: number;
+  inTop5: number;
+  inTop8: number;
+  highest: number;
+}
+
+export interface ProfileReview {
+  pairs: PairCheck[];
+  families: FamilyCheck[];
 }
 
 /**
@@ -219,15 +265,25 @@ export async function buildProfile(games: ProfileGame[], mistakes: ProfileMistak
   // Pairs: each can replace the broader of its two labels (the one that scores higher).
   const inTop = new Set(all.slice(0, TOP_LIST_SIZE + MAX_PAIRS).map((e) => e.key));
   const bestPairFor = new Map<string, WeaknessEntry>();
+  const checks: PairCheck[] = [];
   for (const [pk, s] of pairs) {
     if (s.games.size < PAIR_MIN_GAMES) continue;
     const [a, b] = pk.split("+");
     const parent = scoreOf.get(a)! >= scoreOf.get(b)! ? a : b;
-    if (!inTop.has(parent)) continue;
     const expected = (stats.get(a)!.cost * stats.get(b)!.cost) / totalCost;
     const lift = (s.cost + PAIR_PRIOR_COST) / (expected + PAIR_PRIOR_COST);
-    if (lift < PAIR_MIN_LIFT) continue;
     const score = scoreOf.get(parent)! * lift;
+    const failed: PairOutcome | null =
+      !inTop.has(parent) ? "parentNotInTop" : lift < PAIR_MIN_LIFT ? "notClearlyWorse" : null;
+    if (o.review) {
+      const positions = await trainingPositions(a, b, s, o);
+      checks.push({
+        key: pk, name: describeKey(pk), parent, games: s.games.size, mistakes: s.mistakes, lift, score,
+        positional: !(puzzleLabelForKey(a) && puzzleLabelForKey(b)), positions,
+        outcome: failed ?? (positions < PAIR_MIN_PUZZLES ? "fewPositions" : "anotherPairBetter"), // settled below
+      });
+    }
+    if (failed) continue;
     if ((bestPairFor.get(parent)?.score ?? 0) >= score) continue;
     if ((await trainingPositions(a, b, s, o)) < PAIR_MIN_PUZZLES) continue;
     bestPairFor.set(parent, entry(pk, [a, b], s, score));
@@ -253,7 +309,50 @@ export async function buildProfile(games: ProfileGame[], mistakes: ProfileMistak
     e.score = Math.round(e.score * 1000) / 1000;
   }
 
-  return { top, all, gamesAnalysed: games.length, mistakes: counted };
+  const profile: Profile = { top, all, gamesAnalysed: games.length, mistakes: counted };
+  if (o.review) {
+    const pairChecks = settlePairs(checks, bestPairFor, allowedPairs, top);
+    profile.review = { pairs: pairChecks, families: familyChecks(stats, all, top, pairChecks) };
+  }
+  return profile;
+}
+
+function settlePairs(
+  checks: PairCheck[], best: Map<string, WeaknessEntry>, allowed: Set<string>, top: WeaknessEntry[],
+): PairCheck[] {
+  const inTop = new Set(top.map((e) => e.key));
+  for (const c of checks) {
+    if (c.outcome !== "anotherPairBetter" || best.get(c.parent)?.key !== c.key) continue;
+    c.outcome = !allowed.has(c.key) ? "pairLimit" : inTop.has(c.key) ? "shown" : "outOfTop";
+  }
+  for (const c of checks) {
+    c.lift = Math.round(c.lift * 100) / 100;
+    c.score = Math.round(c.score * 1000) / 1000;
+  }
+  return checks.sort((x, y) => y.score - x.score || x.key.localeCompare(y.key));
+}
+
+/** How each family fares, to see whether big families (tactics) crowd out small ones. */
+function familyChecks(
+  stats: Map<string, Stats>, all: WeaknessEntry[], top: WeaknessEntry[], pairs: PairCheck[],
+): FamilyCheck[] {
+  const parentOf = new Map(pairs.map((p) => [p.key, p.parent]));
+  const out = new Map<string, FamilyCheck>();
+  const get = (f: string) =>
+    out.get(f) ?? out.set(f, { family: f, labels: 0, eligible: 0, inTop5: 0, inTop8: 0, highest: 0 }).get(f)!;
+  for (const k of stats.keys()) get(familyOfKey(k)).labels++;
+  for (const e of all) {
+    const f = get(familyOfKey(e.key));
+    f.eligible++;
+    f.highest = Math.max(f.highest, e.score);
+  }
+  top.forEach((e, i) => {
+    // A pair counts for the family of the broader label it replaced.
+    const f = get(familyOfKey(parentOf.get(e.key) ?? e.key));
+    if (i < 5) f.inTop5++;
+    f.inTop8++;
+  });
+  return [...out.values()].sort((x, y) => y.inTop8 - x.inTop8 || y.highest - x.highest || x.family.localeCompare(y.family));
 }
 
 /**

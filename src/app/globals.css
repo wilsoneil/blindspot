@@ -346,3 +346,10 @@ ol.weaknesses {
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
 
 .weakness-training { color: var(--accent); }
+
+/* Profile check tables: scroll sideways on a phone rather than widen the page. */
+.table-wrap { overflow-x: auto; }
+.check-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.check-table th,
+.check-table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); }
+.check-table th { color: var(--muted); font-weight: 600; white-space: nowrap; }
