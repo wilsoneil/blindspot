@@ -111,20 +111,19 @@ export default async function ProfileCheckPage({ searchParams }: PageProps<"/set
         <h2>Families</h2>
         <p className="small muted">
           Each category is scored against its own family (1 = your average for the family), so a family with many
-          categories can reach higher scores. Labels: categories in the family. Evidence: those with mistakes in at least
-          {MIN_GAMES} games. Max: the highest score.
+          categories can reach higher scores. Evidence: categories with mistakes in at least {MIN_GAMES} games.
+          Max: the highest score.
         </p>
         <div className="table-wrap">
           <table className="check-table">
             <thead>
-              <tr><th>Family</th><th>Labels</th><th>Evidence</th><th>Top 5</th><th>Top 8</th><th>Max</th></tr>
+              <tr><th>Family</th><th>Evidence</th><th>Top 5</th><th>Top 8</th><th>Max</th></tr>
             </thead>
             <tbody>
               {families.map((f) => (
                 <tr key={f.family}>
                   <td>{FAMILY[f.family] ?? f.family}</td>
-                  <td>{f.labels}</td>
-                  <td>{f.eligible}</td>
+                  <td>{f.eligible} / {f.labels}</td>
                   <td>{f.inTop5}</td>
                   <td>{f.inTop8}</td>
                   <td>{f.eligible ? f.highest.toFixed(2) : "–"}</td>
