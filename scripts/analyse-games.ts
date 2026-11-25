@@ -64,7 +64,14 @@ async function gamesToAnalyse(db: Db, userId: string, months: number | null): Pr
 }
 
 async function saveAnalysis(db: Db, game: QueuedGame, a: GameAnalysis) {
-  const del = await db.from("mistakes").delete().eq("game_id", game.id);
+  // Mistakes are saved by (game, move) and updated in place on a re-analysis, so a mistake
+  // that is still a mistake keeps its id, and with it the user's attempts at it as a
+  // "find the move" position, its review schedule and its accepted moves. Ones that no
+  // longer count are removed.
+  const plies = a.mistakes.map((m) => m.ply);
+  let stale = db.from("mistakes").delete().eq("game_id", game.id);
+  if (plies.length) stale = stale.not("ply", "in", `(${plies.join(",")})`);
+  const del = await stale;
   if (del.error) throw new Error(`Could not clear old mistakes: ${del.error.message}`);
   if (a.mistakes.length) {
     const rows = a.mistakes.map((m) => {
@@ -79,7 +86,7 @@ async function saveAnalysis(db: Db, game: QueuedGame, a: GameAnalysis) {
         best_line: m.bestLine.join(" "), refutation: m.refutation.join(" "),
       };
     });
-    const ins = await db.from("mistakes").insert(rows);
+    const ins = await db.from("mistakes").upsert(rows, { onConflict: "game_id,ply" });
     if (ins.error) throw new Error(`Could not save mistakes: ${ins.error.message}`);
   }
   const upd = await db.from("games").update({

@@ -74,7 +74,16 @@ export interface Profile {
   mistakes: number;
 }
 
-const TACTIC_KEYS = LABELS.filter((l) => l.missedAllowed).flatMap((l) => [`${l.id}:missed`, `${l.id}:allowed`]);
+/**
+ * Keys that are never scored. "Defensive move (allowed)" = "your move let the opponent play
+ * a good defensive move": not something a puzzle can train, and before analysis version 2 it
+ * was a catch-all for positional mistakes. "Defensive move (missed)" is kept.
+ */
+export const NOT_SCORED = new Set(["defensiveMove:allowed"]);
+
+const TACTIC_KEYS = LABELS.filter((l) => l.missedAllowed)
+  .flatMap((l) => [`${l.id}:missed`, `${l.id}:allowed`])
+  .filter((k) => !NOT_SCORED.has(k));
 const COMPUTED_KEYS = LABELS.filter((l) => !l.missedAllowed).map((l) => l.id);
 const EARLY_PHASES = new Set(["phaseOpening", "phaseTransition"]);
 
@@ -162,7 +171,7 @@ export async function buildProfile(games: ProfileGame[], mistakes: ProfileMistak
     counted++;
     const cost = m.drop * decay(m.playedAt);
     totalCost += cost;
-    const keys = [...new Set(m.labels)];
+    const keys = [...new Set(m.labels)].filter((k) => !NOT_SCORED.has(k));
     if (EARLY_PHASES.has(m.phase)) keys.push(openingOf.get(m.gameId)!);
     for (const k of keys) {
       const s = get(k);

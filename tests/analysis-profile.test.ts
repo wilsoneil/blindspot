@@ -37,6 +37,20 @@ describe("buildProfile", () => {
     expect(p).toMatchObject({ gamesAnalysed: 20, mistakes: 9 });
   });
 
+  it("never scores 'defensive move (allowed)', but keeps the missed side", async () => {
+    const m = [
+      ...[1, 2, 3, 4, 5, 6, 7, 8].map((id) => mistake(id, ["defensiveMove:allowed"], 0.6)),
+      ...[9, 10, 11].map((id) => mistake(id, ["defensiveMove:missed", "fork:allowed"], 0.3)),
+    ];
+    const p = await buildProfile(games(20), m, opts);
+    const keys = p.all.map((e) => e.key);
+    expect(keys).not.toContain("defensiveMove:allowed");
+    expect(keys).toContain("defensiveMove:missed");
+    expect(keys).toContain("fork:allowed");
+    expect(p.top.some((e) => e.key.includes("defensiveMove:allowed"))).toBe(false); // nor in a pair
+    expect(p.mistakes).toBe(11); // the mistakes still count, under their other labels
+  });
+
   it(`needs mistakes in at least ${MIN_GAMES} distinct games`, async () => {
     const m = [mistake(1, ["skewer:missed"], 0.9), mistake(1, ["skewer:missed"], 0.9), mistake(2, ["skewer:missed"], 0.9)];
     const p = await buildProfile(games(20), m, opts);
