@@ -1,5 +1,6 @@
 // The top-weaknesses list on the home page.
 
+import { describeKey } from "@/lib/analysis/profile";
 import type { StoredProfile } from "@/lib/weakness-store";
 
 export const formatDate = (iso: string) =>
@@ -13,7 +14,8 @@ export function WeaknessList({ profile, shown }: { profile: StoredProfile; shown
         {top.map((w) => (
           <li key={w.key} className="weakness">
             <div className="weakness-head">
-              <span className="weakness-name">{w.name}</span>
+              {/* Named from the key, so a wording change shows without waiting for the next rebuild. */}
+              <span className="weakness-name">{describeKey(w.key)}</span>
               <span className="weakness-score" aria-label={`Severity ${w.severity} out of 100`}>{w.severity}</span>
             </div>
             <div className="bar" aria-hidden="true">
