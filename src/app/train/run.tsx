@@ -150,7 +150,7 @@ export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives, in
               <li key={d.puzzle.id}>
                 <span className={d.correct ? "check" : "cross"}>{d.correct ? "✓" : "✗"}</span>{" "}
                 {d.puzzle.position ? (
-                  <span>Your game: {d.puzzle.position.bestSan}</span>
+                  <span>Your game: {d.puzzle.position.bestSan} <span className="muted">(you played {d.puzzle.position.playedSan})</span></span>
                 ) : (
                   <>
                     <a href={`https://lichess.org/training/${d.puzzle.id}`} target="_blank" rel="noreferrer">{d.puzzle.id}</a>{" "}

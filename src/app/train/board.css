@@ -108,3 +108,4 @@
 .run-clock.over { color: var(--bad); }
 .run-results { margin: 0.75rem 0 0; padding-left: 1.5rem; columns: 2; }
 .run-stats { margin: 0.25rem 0 0.5rem; }
+.game-move-key { color: #c33; font-weight: 700; }

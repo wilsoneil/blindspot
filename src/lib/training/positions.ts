@@ -15,6 +15,8 @@ interface MistakeRow {
   accepted_moves: string[] | null;
   subtlety: number | null;
   played_san: string;
+  played_uci: string;
+  refutation: string;
   best_san: string;
   played_at: string;
 }
@@ -36,7 +38,10 @@ export async function attemptedMistakeIds(db: Pick<Db, "from">, userId: string):
 export function positionFromMistake(m: MistakeRow, level: number): TrainingPuzzle {
   return {
     id: `m${m.id}`, fen: m.fen, moves: [], rating: approxRating(level, m.subtlety ?? 0.5), themes: [], labels: m.labels,
-    position: { mistakeId: m.id, accepted: m.accepted_moves ?? [], playedSan: m.played_san, bestSan: m.best_san, playedAt: m.played_at },
+    position: {
+      mistakeId: m.id, accepted: m.accepted_moves ?? [], playedSan: m.played_san, playedUci: m.played_uci,
+      refutation: (m.refutation ?? "").split(" ").filter(Boolean), bestSan: m.best_san, playedAt: m.played_at,
+    },
   };
 }
 
@@ -66,7 +71,7 @@ export async function selectPositions(db: Pick<Db, "from">, o: PositionSelect): 
   const rows: MistakeRow[] = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await db.from("mistakes")
-      .select("id, fen, labels, accepted_moves, subtlety, played_san, best_san, played_at")
+      .select("id, fen, labels, accepted_moves, subtlety, played_san, played_uci, refutation, best_san, played_at")
       .eq("user_id", o.userId).contains("labels", o.labelKeys).not("accepted_moves", "is", null)
       .order("id").range(from, from + PAGE - 1);
     if (error) {

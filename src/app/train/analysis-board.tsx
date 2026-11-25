@@ -25,6 +25,8 @@ export interface AnalysisBoardProps {
   engineDefault: boolean;
   /** Where to start in the line (default 1: after a puzzle's setup move). */
   startPly?: number;
+  /** An own position: the move played in the game (a red arrow) and the opponent's best reply line. */
+  gameMove?: { uci: string; san: string; refutation: string[] };
 }
 
 /** The position after the first `ply` moves of a line, plus the last move played. */
@@ -44,7 +46,7 @@ function dests(chess: Chess): Map<Key, Key[]> {
   return out;
 }
 
-export function AnalysisBoard({ fen, line: puzzleLine, orientation, engineDefault, startPly = 1 }: AnalysisBoardProps) {
+export function AnalysisBoard({ fen, line: puzzleLine, orientation, engineDefault, startPly = 1, gameMove }: AnalysisBoardProps) {
   const el = useRef<HTMLDivElement>(null);
   const ground = useRef<Api | null>(null);
   const [line, setLine] = useState(puzzleLine);
@@ -53,7 +55,10 @@ export function AnalysisBoard({ fen, line: puzzleLine, orientation, engineDefaul
   const position = useMemo(() => replay(fen, line, ply), [fen, line, ply]);
   const positionFen = position.chess.fen();
   const engine = useStockfish(positionFen, engineOn);
-  const offLine = line.join(" ") !== puzzleLine.join(" ");
+  const gameLine = gameMove ? [gameMove.uci, ...gameMove.refutation.slice(0, 7)] : null;
+  const onGameLine = !!gameLine && line.join(" ") === gameLine.join(" ");
+  const offLine = line.join(" ") !== puzzleLine.join(" ") && !onGameLine;
+  const atStart = position.chess.fen() === new Chess(fen).fen();
 
   // Moves played on the board: follow the line if it matches, otherwise branch off.
   const lineRef = useRef({ line, ply });
@@ -106,12 +111,16 @@ export function AnalysisBoard({ fen, line: puzzleLine, orientation, engineDefaul
       lastMove: last ? [last.slice(0, 2) as Key, last.slice(2, 4) as Key] : undefined,
       movable: { color: turn, dests: dests(chess) },
       drawable: {
-        autoShapes: engine.lines[0]?.pv[0]
-          ? [{ orig: engine.lines[0].pv[0].slice(0, 2) as Key, dest: engine.lines[0].pv[0].slice(2, 4) as Key, brush: "blue" }]
-          : [],
+        autoShapes: [
+          ...(engine.lines[0]?.pv[0]
+            ? [{ orig: engine.lines[0].pv[0].slice(0, 2) as Key, dest: engine.lines[0].pv[0].slice(2, 4) as Key, brush: "blue" }]
+            : []),
+          // The move played in the game, in the starting position.
+          ...(gameMove && atStart ? [{ orig: gameMove.uci.slice(0, 2) as Key, dest: gameMove.uci.slice(2, 4) as Key, brush: "red" }] : []),
+        ],
       },
     });
-  }, [position, engine.lines]);
+  }, [position, engine.lines, gameMove, atStart]);
 
   // Arrow keys step through the line.
   useEffect(() => {
@@ -146,6 +155,21 @@ export function AnalysisBoard({ fen, line: puzzleLine, orientation, engineDefaul
           Engine
         </label>
       </div>
+      {gameMove && (
+        <p className="small" style={{ margin: "0.5rem 0 0" }}>
+          <span className="game-move-key" aria-hidden="true">→</span> In the game you played <strong>{gameMove.san}</strong>.{" "}
+          {onGameLine ? (
+            <>
+              <span className="muted">Step forward to see the opponent&rsquo;s best reply. </span>
+              <button type="button" className="link-button" onClick={() => { setLine(puzzleLine); setPly(startPly); }}>Back to the position</button>
+            </>
+          ) : (
+            <button type="button" className="link-button" onClick={() => { setLine(gameLine!); setPly(1); }}>
+              What happened in the game
+            </button>
+          )}
+        </p>
+      )}
       {offLine && (
         <p className="small muted" style={{ margin: "0.5rem 0 0" }}>
           Exploring your own line.{" "}
