@@ -23,7 +23,11 @@ import { requireDb, type Db } from "../src/lib/db";
 import { settingsFromRow, type SettingsRow } from "../src/lib/settings";
 import { ANALYSED_TIME_CLASSES, historyStart, rebuildProfiles } from "../src/lib/weakness-store";
 import { Stockfish } from "./lib/stockfish";
+import { withRetry } from "./lib/retry";
 import { LichessTagger } from "./lib/tagger";
+
+/** Games in a row that couldn't be saved even after retrying: the database is down, so stop. */
+const MAX_FAILURES_IN_A_ROW = 3;
 
 try { process.loadEnvFile(".env.local"); } catch { /* no local file: use the real environment */ }
 
@@ -122,7 +126,21 @@ async function main() {
 
   const deadline = Date.now() + minutes * 60_000;
   const started = Date.now();
-  let analysed = 0, unreadable = 0, mistakes = 0, positions = 0, tagErrors = 0;
+  let analysed = 0, unreadable = 0, mistakes = 0, positions = 0, tagErrors = 0, skipped = 0;
+  let failuresInARow = 0;
+  /** Saves with retries; a game that still can't be saved is skipped (the next run tries it again). */
+  const save = async (what: () => Promise<void>): Promise<boolean> => {
+    try {
+      await withRetry(what);
+      failuresInARow = 0;
+      return true;
+    } catch (e) {
+      skipped++;
+      console.log(`  A game couldn't be saved and was skipped: ${e instanceof Error ? e.message : e}`);
+      if (++failuresInARow >= MAX_FAILURES_IN_A_ROW) throw new Error(`${failuresInARow} games in a row couldn't be saved: stopping.`);
+      return false;
+    }
+  };
 
   for (const [n, u] of users.entries()) {
     const label = `User ${n + 1}`;
@@ -143,12 +161,11 @@ async function main() {
           try {
             readGame(game.pgn);
           } catch (e) {
-            await markUnreadable(db, game, e);
-            unreadable++;
+            if (await save(() => markUnreadable(db, game, e))) unreadable++;
             continue;
           }
           const result = await analyseGame({ pgn: game.pgn, colour: game.colour, openingName: game.opening_name }, engine, tagger);
-          await saveAnalysis(db, game, result);
+          if (!(await save(() => saveAnalysis(db, game, result)))) continue;
           analysed++;
           mistakes += result.mistakes.length;
           positions += result.positions;
@@ -166,13 +183,14 @@ async function main() {
     await Promise.all(Array.from({ length: Math.max(1, workers) }, worker));
 
     console.log(`${label}: ${taken} games done this run, ${total - taken} still to analyse`);
-    const keys = await rebuildProfiles(db, u.user_id, settings);
+    const keys = await withRetry(() => rebuildProfiles(db, u.user_id, settings));
     console.log(`${label}: weakness profiles rebuilt for ${keys.length} time controls`);
   }
 
   const mins = ((Date.now() - started) / 60_000).toFixed(1);
   console.log(`Done in ${mins} minutes: ${analysed} games analysed, ${mistakes} mistakes found, ${positions} positions.`);
   if (unreadable) console.log(`${unreadable} games couldn't be read and were set aside.`);
+  if (skipped) console.log(`${skipped} games couldn't be saved this run; the next run tries them again.`);
   if (tagErrors) console.log(`The tagger couldn't handle ${tagErrors} lines (those mistakes have no tactical tags).`);
 }
 
