@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { describeKey } from "@/lib/analysis/profile";
 import { getAppContext } from "@/lib/app-data";
 import { clientPuzzle } from "@/lib/training/client-puzzle";
-import { DEFAULT_LEVEL, selectPuzzles, trainingSource } from "@/lib/training/select";
+import { puzzleLevel } from "@/lib/training/rating";
+import { selectPuzzles, trainingSource } from "@/lib/training/select";
 import { describeProfileKey, profileKeyForSetting } from "@/lib/weakness-store";
 import { SetupNotice } from "../../setup-notice";
 import { Drill } from "./drill";
@@ -37,7 +38,8 @@ export default async function DrillPage({ searchParams }: PageProps<"/train/dril
     );
   }
 
-  const puzzles = await selectPuzzles(ctx.db, { userId: ctx.userId, puzzleLabels: source.puzzleLabels, count: 5 });
+  const level = await puzzleLevel(ctx.db, ctx.userId); // the Blindspot rating: hidden until Phase 4
+  const puzzles = await selectPuzzles(ctx.db, { userId: ctx.userId, puzzleLabels: source.puzzleLabels, count: 5, level });
   return (
     <section className="card">
       <h1>{describeKey(weaknessKey)} <span className="pill">Drill</span></h1>
@@ -49,7 +51,7 @@ export default async function DrillPage({ searchParams }: PageProps<"/train/dril
         <Drill
           weaknessKey={weaknessKey}
           profileKey={profileKey}
-          initial={puzzles.map((p) => clientPuzzle(p, ctx.settings, DEFAULT_LEVEL))}
+          initial={puzzles.map((p) => clientPuzzle(p, ctx.settings, level))}
           engineDefault={ctx.settings.engineOnBoard}
         />
       ) : (

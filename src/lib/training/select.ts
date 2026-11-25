@@ -24,8 +24,8 @@ export function trainingSource(labelKeys: string[]): TrainingSource {
 }
 
 /**
- * The user's puzzle level until the Blindspot rating exists (step 6): the usual Glicko-2
- * starting rating, so the first puzzles sit in the middle of the Lichess range.
+ * The level when none is given: the Glicko-2 starting rating. Pages pass the user's
+ * Blindspot rating (src/lib/training/rating.ts).
  */
 export const DEFAULT_LEVEL = 1500;
 
