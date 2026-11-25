@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getAppContext } from "@/lib/app-data";
 import { clientPuzzle } from "@/lib/training/client-puzzle";
 import { puzzleLevel } from "@/lib/training/rating";
+import { runStats } from "@/lib/training/stats";
 import { mixedWeaknesses, selectRunPuzzles, shuffled } from "@/lib/training/run";
 import { describeProfileKey, loadProfiles, profileKeyForSetting } from "@/lib/weakness-store";
 import { SetupNotice } from "../setup-notice";
@@ -42,9 +43,10 @@ export async function MixedModePage({ mode, tc }: { mode: "rush" | "survival"; t
   }
 
   const level = await puzzleLevel(ctx.db, ctx.userId);
-  const puzzles = await selectRunPuzzles(ctx.db, {
-    userId: ctx.userId, weaknesses, level, fromChunk: 0, chunks: 2,
-  });
+  const [puzzles, stats] = await Promise.all([
+    selectRunPuzzles(ctx.db, { userId: ctx.userId, weaknesses, level, fromChunk: 0, chunks: 2 }),
+    runStats(ctx.db, ctx.userId, mode),
+  ]);
   return (
     <section className="card">
       <h1>{title} <span className="pill">{describeProfileKey(profileKey)}</span></h1>
@@ -55,6 +57,7 @@ export async function MixedModePage({ mode, tc }: { mode: "rush" | "survival"; t
         initial={puzzles.map((p) => clientPuzzle(p, ctx.settings, level))}
         rushMs={ctx.settings.rushMinutes * 60_000}
         lives={mode === "rush" ? RUSH_LIVES : ctx.settings.survivalLives}
+        stats={stats}
         intro={`${TEXT[mode](ctx.settings)} Puzzles come from all your top weaknesses, mixed with earlier misses that are due for another look.`}
       />
       {back}

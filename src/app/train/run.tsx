@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { attemptRef, type ClientPuzzle } from "@/lib/training/client-puzzle";
 import { CHUNK } from "@/lib/training/run";
+import type { RunStats } from "@/lib/training/stats";
 import { moreRunPuzzles, saveAttempt } from "./actions";
 import { PuzzleBoard, type PuzzleResult } from "./puzzle-board";
 
@@ -20,12 +21,14 @@ interface Props {
   lives: number;
   /** What the mode is, shown only before the run starts. */
   intro: string;
+  /** Past runs of this mode, shown before the run starts. */
+  stats: RunStats;
 }
 
 type Done = { puzzle: ClientPuzzle; correct: boolean };
 const NEXT_DELAY_MS = 600;
 
-export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives, intro }: Props) {
+export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives, intro, stats }: Props) {
   const [phase, setPhase] = useState<"ready" | "playing" | "over">("ready");
   const [queue, setQueue] = useState(initial);
   const [index, setIndex] = useState(0);
@@ -110,6 +113,16 @@ export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives, in
     return (
       <>
         <p className="small muted">{intro}</p>
+        {stats.runs > 0 ? (
+          <div className="stats run-stats">
+            <div className="stat"><div className="stat-value">{stats.best}</div><div className="stat-label">best ever</div></div>
+            <div className="stat"><div className="stat-value">{stats.bestThisWeek ?? "–"}</div><div className="stat-label">best this week</div></div>
+            <div className="stat"><div className="stat-value">{stats.last}</div><div className="stat-label">last run</div></div>
+            <div className="stat"><div className="stat-value">{stats.runs}</div><div className="stat-label">runs played</div></div>
+          </div>
+        ) : (
+          <p className="small muted">Your first {mode === "rush" ? "rush" : "survival run"}: your best scores will show here.</p>
+        )}
         <div className="save-bar" style={{ margin: "0.5rem 0 1rem" }}>
           <button type="button" className="button" onClick={start} disabled={!puzzle}>
             {mode === "rush" ? `Start the ${Math.round(rushMs / 60_000)}-minute rush` : "Start"}
@@ -123,7 +136,10 @@ export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives, in
   if (phase === "over") {
     return (
       <div style={{ margin: "0.5rem 0 1rem" }}>
-        <p className="muted" style={{ marginBottom: "0.25rem" }}>{endReason}</p>
+        <p className="muted" style={{ marginBottom: "0.25rem" }}>
+          {endReason}
+          {score > 0 && score > (stats.best ?? 0) && <strong className="message-ok"> New best!</strong>}
+        </p>
         <div className="stats">
           <div className="stat"><div className="stat-value">{score}</div><div className="stat-label">solved</div></div>
           <div className="stat"><div className="stat-value">{done.length}</div><div className="stat-label">attempted</div></div>
