@@ -11,7 +11,7 @@ import "@lichess-org/chessground/assets/chessground.base.css";
 import "@lichess-org/chessground/assets/chessground.cburnett.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Square } from "chess.js";
-import { PuzzleRun, type Uci } from "@/lib/training/play";
+import { FindMoveRun, PuzzleRun, type BoardRun, type Uci } from "@/lib/training/play";
 import "./board.css";
 
 export interface PuzzleResult {
@@ -35,6 +35,8 @@ export interface PuzzleBoardProps {
   onFinish?: (result: PuzzleResult) => void;
   /** Show a "Show solution" button (Drill, Blindspot). */
   allowReveal?: boolean;
+  /** A "find the move" position: `fen` is the position to move in, and any of these moves solves it. */
+  accepted?: Uci[];
 }
 
 type Status =
@@ -55,10 +57,10 @@ const PROMOTION_PIECES = [
 
 const squares = (uci: Uci): Key[] => [uci.slice(0, 2) as Key, uci.slice(2, 4) as Key];
 
-export function PuzzleBoard({ fen, moves, targetMs, onWrong = "retry", onFinish, allowReveal = false }: PuzzleBoardProps) {
+export function PuzzleBoard({ fen, moves, targetMs, onWrong = "retry", onFinish, allowReveal = false, accepted }: PuzzleBoardProps) {
   const el = useRef<HTMLDivElement>(null);
   const ground = useRef<Api | null>(null);
-  const run = useRef<PuzzleRun | null>(null);
+  const run = useRef<BoardRun | null>(null);
   const startedAt = useRef(0);
   const wrongMoves = useRef(0);
   const finished = useRef(false);
@@ -69,6 +71,7 @@ export function PuzzleBoard({ fen, moves, targetMs, onWrong = "retry", onFinish,
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const movesKey = moves.join(" "); // a new array with the same moves mustn't restart the puzzle
+  const acceptedKey = accepted?.join(" ") ?? null;
 
   useEffect(() => {
     onFinishRef.current = onFinish;
@@ -136,9 +139,9 @@ export function PuzzleBoard({ fen, moves, targetMs, onWrong = "retry", onFinish,
   // Create the board once per puzzle.
   useEffect(() => {
     if (!el.current) return;
-    let r: PuzzleRun;
+    let r: BoardRun;
     try {
-      r = new PuzzleRun(fen, movesKey.split(" "));
+      r = acceptedKey !== null ? new FindMoveRun(fen, acceptedKey.split(" ").filter(Boolean)) : new PuzzleRun(fen, movesKey.split(" "));
     } catch (e) {
       // Shown below the board; the board itself stays empty.
       queueMicrotask(() => setError(e instanceof Error ? e.message : "This puzzle can't be played."));
@@ -167,7 +170,7 @@ export function PuzzleBoard({ fen, moves, targetMs, onWrong = "retry", onFinish,
     }
 
     const timer = setTimeout(() => {
-      sync(r.setupMove);
+      sync(r.setupMove ?? undefined);
       startedAt.current = performance.now();
       setStatus({ kind: "playing" });
     }, SETUP_DELAY_MS);
@@ -178,7 +181,7 @@ export function PuzzleBoard({ fen, moves, targetMs, onWrong = "retry", onFinish,
       ground.current = null;
       run.current = null;
     };
-  }, [fen, movesKey, submit, sync]);
+  }, [fen, movesKey, acceptedKey, submit, sync]);
 
   // The clock, while the puzzle is being played.
   useEffect(() => {

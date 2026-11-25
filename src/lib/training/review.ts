@@ -34,12 +34,19 @@ function check(error: { message: string } | null, what: string) {
   if (error) throw new Error(`Could not ${what}: ${error.message}`);
 }
 
+/** A Lichess puzzle or one of the user's own positions (a stored mistake). */
+export type ReviewItem = { puzzleId: string } | { mistakeId: number };
+
+const column = (item: ReviewItem) =>
+  "puzzleId" in item ? { name: "puzzle_id", value: item.puzzleId } : { name: "mistake_id", value: item.mistakeId };
+
 /** Applies an attempt's result to the queue. */
 export async function updateReview(
-  db: Pick<Db, "from">, userId: string, puzzleId: string, fullySolved: boolean, now = new Date(),
+  db: Pick<Db, "from">, userId: string, item: ReviewItem, fullySolved: boolean, now = new Date(),
 ): Promise<ReviewChange> {
+  const col = column(item);
   const { data, error } = await db.from("review_queue")
-    .select("id, step, due_at").eq("user_id", userId).eq("puzzle_id", puzzleId).maybeSingle();
+    .select("id, step, due_at").eq("user_id", userId).eq(col.name, col.value).maybeSingle();
   check(error, "read the review queue");
   const row = data as { id: number; step: number; due_at: string } | null;
   const change = nextReview(row ? { step: row.step, dueAt: new Date(row.due_at) } : null, fullySolved, now);
@@ -47,7 +54,7 @@ export async function updateReview(
   switch (change.kind) {
     case "added": {
       const { error: e } = await db.from("review_queue").insert({
-        user_id: userId, puzzle_id: puzzleId, step: 0, due_at: change.dueAt.toISOString(), updated_at: stamp,
+        user_id: userId, [col.name]: col.value, step: 0, due_at: change.dueAt.toISOString(), updated_at: stamp,
       });
       check(e, "add to the review queue");
       break;
@@ -69,11 +76,12 @@ export async function updateReview(
   return change;
 }
 
-/** Puzzle ids due for review now, soonest first. */
-export async function dueReviews(db: Pick<Db, "from">, userId: string, limit: number, now = new Date()): Promise<string[]> {
+/** Puzzles and positions due for review now, soonest first. */
+export async function dueReviews(db: Pick<Db, "from">, userId: string, limit: number, now = new Date()): Promise<ReviewItem[]> {
   const { data, error } = await db.from("review_queue")
-    .select("puzzle_id, due_at").eq("user_id", userId).not("puzzle_id", "is", null)
+    .select("puzzle_id, mistake_id, due_at").eq("user_id", userId)
     .lte("due_at", now.toISOString()).order("due_at").limit(limit);
   check(error, "read the review queue");
-  return (data as { puzzle_id: string }[]).map((r) => r.puzzle_id);
+  return (data as { puzzle_id: string | null; mistake_id: number | null }[])
+    .map((r) => (r.puzzle_id ? { puzzleId: r.puzzle_id } : { mistakeId: r.mistake_id! }));
 }

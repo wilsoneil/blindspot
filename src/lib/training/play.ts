@@ -16,7 +16,84 @@ export type MoveResult =
   | { result: "wrong" } // not the solution; the position is left as it was before the move
   | { result: "illegal" };
 
-export class PuzzleRun {
+/** What the board needs from a puzzle or a "find the move" position. */
+export interface BoardRun {
+  readonly chess: Chess;
+  readonly userColor: "white" | "black";
+  readonly userMoves: number;
+  /** The opponent's move before the user's first, if any (Lichess puzzles have one). */
+  readonly setupMove: Uci | null;
+  readonly solved: boolean;
+  readonly fen: string;
+  dests(): Map<Square, Square[]>;
+  isPromotion(from: Square, to: Square): boolean;
+  play(uci: Uci): MoveResult;
+  expectedMove(): Uci | null;
+}
+
+function legalDests(chess: Chess): Map<Square, Square[]> {
+  const out = new Map<Square, Square[]>();
+  for (const m of chess.moves({ verbose: true })) out.set(m.from, [...(out.get(m.from) ?? []), m.to]);
+  return out;
+}
+
+function tryMove(chess: Chess, uci: Uci) {
+  try {
+    return chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
+  } catch {
+    return null; // chess.js throws on an illegal move
+  }
+}
+
+/**
+ * A "find the move" position from the user's own game: one move to find, and any of the
+ * accepted moves (worked out by Stockfish, src/lib/analysis/accepted.ts) solves it.
+ */
+export class FindMoveRun implements BoardRun {
+  readonly chess: Chess;
+  readonly userColor: "white" | "black";
+  readonly userMoves = 1;
+  readonly setupMove = null;
+  private done = false;
+
+  constructor(fen: string, private readonly accepted: Uci[]) {
+    if (accepted.length === 0) throw new Error("This position has no accepted moves.");
+    this.chess = new Chess(fen);
+    this.userColor = this.chess.turn() === "w" ? "white" : "black";
+  }
+
+  get solved() {
+    return this.done;
+  }
+
+  get fen() {
+    return this.chess.fen();
+  }
+
+  dests() {
+    return this.done ? new Map<Square, Square[]>() : legalDests(this.chess);
+  }
+
+  isPromotion(from: Square, to: Square) {
+    return this.chess.get(from)?.type === "p" && (to[1] === "8" || to[1] === "1");
+  }
+
+  play(uci: Uci): MoveResult {
+    if (this.done || !tryMove(this.chess, uci)) return { result: "illegal" };
+    if (this.accepted.includes(uci)) {
+      this.done = true;
+      return { result: "solved" };
+    }
+    this.chess.undo();
+    return { result: "wrong" };
+  }
+
+  expectedMove() {
+    return this.done ? null : this.accepted[0];
+  }
+}
+
+export class PuzzleRun implements BoardRun {
   readonly chess: Chess;
   readonly userColor: "white" | "black";
   /** Moves the user has to play to solve it. */
@@ -34,7 +111,7 @@ export class PuzzleRun {
   }
 
   /** The opponent's setup move, for highlighting as the last move. */
-  get setupMove(): Uci {
+  get setupMove(): Uci | null {
     return this.moves[0];
   }
 
@@ -48,12 +125,7 @@ export class PuzzleRun {
 
   /** Legal moves from each square, in the form the board wants. */
   dests(): Map<Square, Square[]> {
-    const out = new Map<Square, Square[]>();
-    if (this.done) return out;
-    for (const m of this.chess.moves({ verbose: true })) {
-      out.set(m.from, [...(out.get(m.from) ?? []), m.to]);
-    }
-    return out;
+    return this.done ? new Map<Square, Square[]>() : legalDests(this.chess);
   }
 
   /** Whether moving from `from` to `to` is a pawn reaching the last rank (so a piece must be chosen). */
@@ -92,11 +164,7 @@ export class PuzzleRun {
   }
 
   private apply(uci: Uci) {
-    try {
-      return this.chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
-    } catch {
-      return null; // chess.js throws on an illegal move
-    }
+    return tryMove(this.chess, uci);
   }
 }
 

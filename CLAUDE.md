@@ -7,7 +7,7 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 - Phase 1A (hello-world page deployed from GitHub to Vercel): done
 - Phase 1 (Foundations, including login): done. Sign-in live; games imported (daily import scheduled); puzzle store built (155,285 puzzles, every label covered; labels reviewed against the full Lichess database)
 - Phase 2 (Analysis): done. Migration 0004 applied; 12-month backlog analysed (684 blitz games, 2,560 mistakes); the first real profile looks sensible (a mix of single labels and endgame pairs). Daily analysis runs after the import
-- Phase 3 (Training): in progress. Decisions in SPEC.md (target time, repetition schedule, accepted moves; Blindspot rating calculated from Phase 3, shown in Phase 4). Steps 1–9 done; migration 0005 applied
+- Phase 3 (Training): in progress. Decisions in SPEC.md (target time, repetition schedule, accepted moves; Blindspot rating calculated from Phase 3, shown in Phase 4). Steps 1–10 done; migration 0005 applied, 0006 to apply
 
 ### Phase 3 plan (one pull request per step)
 
@@ -20,7 +20,7 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 7. Puzzle scores in the profile blend: **done** (`src/lib/analysis/puzzle-scores.ts`; rebuilt daily and every 10 puzzles in a session)
 8. Rush and Survival: **done** (`/train/rush`, `/train/survival`, ladder in `src/lib/training/run.ts`)
 9. Blindspot mode and the review queue: **done** (`/train/blindspot`, `src/lib/training/review.ts`, `blindspot.ts`)
-10. Positional "find the move" drills (analysis job stores accepted moves and subtlety; backfill)
+10. Positional "find the move" drills (analysis job stores accepted moves and subtlety; backfill): **done** in code (`scripts/find-moves.ts`, `src/lib/training/positions.ts`); needs migration 0006 applied, then an "Analyse games" run to fill the backlog
 11. Openings: chess.com names to Lichess `OpeningTags`
 12. Review: positional pairs' 200 rule, tactics dominance; mark Phase 3 done
 
@@ -52,7 +52,7 @@ Update this section when a phase is finished.
 ## Commands
 
 - `npm run dev`: local site; `npm test`: tests; `npm run lint`; `npm run build`
-- `npm run import:games`, `npm run analyse:games -- --limit 5`, `npm run build:puzzles -- --dry-run`: data jobs (also GitHub Actions workflows)
+- `npm run import:games`, `npm run analyse:games -- --limit 5`, `npm run find:moves`, `npm run build:puzzles -- --dry-run`: data jobs (also GitHub Actions workflows)
 - Database changes go in a new numbered file in `supabase/migrations/`; never edit an applied one.
 - Next.js here is 16.x, newer than most training data: check `node_modules/next/dist/docs/` before using an unfamiliar API (see AGENTS.md). Cache Components is deliberately off.
 

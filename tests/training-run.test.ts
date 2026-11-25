@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { CHUNK, chunkWeaknesses, ladderRating, mixedWeaknesses, selectRunPuzzles, shuffled } from "../src/lib/training/run";
 import { fakeDb } from "./fake-db";
 
+/** A weakness trained by Lichess puzzles with one label. */
+const W = (label: string) => ({ key: `${label}:missed`, kind: "puzzles" as const, puzzleLabels: [label] });
+
 function seeded(seed = 7) {
   let s = seed;
   return () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
@@ -36,7 +39,7 @@ describe("selectRunPuzzles", () => {
   it("mixes weaknesses within each chunk and gets harder chunk by chunk", async () => {
     const { db } = fakeDb({ puzzles: store(["fork", "pin", "skewer"]), puzzle_attempts: [] });
     const got = await selectRunPuzzles(db, {
-      userId: "u1", weaknesses: [["fork"], ["pin"], ["skewer"]], level: 1500, fromChunk: 0, chunks: 3, random: seeded(),
+      userId: "u1", weaknesses: [W("fork"), W("pin"), W("skewer")], level: 1500, fromChunk: 0, chunks: 3, random: seeded(),
     });
     expect(got).toHaveLength(3 * CHUNK);
     expect(new Set(got.map((p) => p.id)).size).toBe(got.length);
@@ -56,7 +59,7 @@ describe("selectRunPuzzles", () => {
     const attempted = puzzles.filter((p) => p.rating >= 1100 && p.rating <= 1300).map((p, i) => ({ id: i, user_id: "u1", puzzle_id: p.id }));
     const { db } = fakeDb({ puzzles, puzzle_attempts: attempted });
     const got = await selectRunPuzzles(db, {
-      userId: "u1", weaknesses: [["fork"]], level: 1500, fromChunk: 0, chunks: 2, exclude: ["fork045"], random: seeded(),
+      userId: "u1", weaknesses: [W("fork")], level: 1500, fromChunk: 0, chunks: 2, exclude: ["fork045"], random: seeded(),
     });
     const ids = got.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -71,7 +74,7 @@ describe("selectRunPuzzles", () => {
 });
 
 describe("mixedWeaknesses", () => {
-  it("keeps the shown weaknesses that Lichess puzzles train", () => {
+  it("keeps the shown weaknesses that can be trained, with puzzles or the user's own positions", () => {
     const top = [
       { key: "fork:missed", labels: ["fork:missed"] },
       { key: "phaseTransition", labels: ["phaseTransition"] },
@@ -80,8 +83,9 @@ describe("mixedWeaknesses", () => {
       { key: "skewer:missed", labels: ["skewer:missed"] },
     ];
     expect(mixedWeaknesses(top, 4)).toEqual([
-      { key: "fork:missed", puzzleLabels: ["fork"] },
-      { key: "pin:allowed+rookEndgame", puzzleLabels: ["pin", "rookEndgame"] },
+      { key: "fork:missed", kind: "puzzles", puzzleLabels: ["fork"] },
+      { key: "phaseTransition", kind: "ownGames", labelKeys: ["phaseTransition"] },
+      { key: "pin:allowed+rookEndgame", kind: "puzzles", puzzleLabels: ["pin", "rookEndgame"] },
     ]);
   });
 });

@@ -43,6 +43,18 @@ export interface TrainingPuzzle {
   rating: number;
   themes: string[];
   labels: string[];
+  /** Set for a "find the move" position from the user's own game (src/lib/training/positions.ts). */
+  position?: PositionDetails;
+}
+
+export interface PositionDetails {
+  mistakeId: number;
+  /** Any of these solves it; `fen` is the position to move in and `moves` is empty. */
+  accepted: string[];
+  /** What happened in the game, shown afterwards. */
+  playedSan: string;
+  bestSan: string;
+  playedAt: string;
 }
 
 interface PuzzleDbRow {

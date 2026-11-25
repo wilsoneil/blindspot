@@ -18,7 +18,7 @@ export function WeaknessList({ profile, shown }: { profile: StoredProfile; shown
             <div className="weakness-head">
               {/* Named from the key, so a wording change shows without waiting for the next rebuild. */}
               <span className="weakness-name">{describeKey(w.key)}</span>
-              {trainingSource(w.labels).kind === "puzzles" && (
+              {trainingSource(w.labels).kind !== "notYet" && (
                 <Link
                   className="drill-link"
                   href={`/train/drill?w=${encodeURIComponent(w.key)}&tc=${encodeURIComponent(profile.profileKey)}`}
@@ -38,7 +38,7 @@ export function WeaknessList({ profile, shown }: { profile: StoredProfile; shown
           </li>
         ))}
       </ol>
-      {top.some((w) => trainingSource(w.labels).kind === "puzzles") && (
+      {top.some((w) => trainingSource(w.labels).kind !== "notYet") && (
         <div className="modes">
           <span className="small muted">All your top weaknesses, mixed:</span>
           <Link className="button" href={`/train/blindspot?tc=${encodeURIComponent(profile.profileKey)}`}>Blindspot</Link>
@@ -54,7 +54,7 @@ export function WeaknessList({ profile, shown }: { profile: StoredProfile; shown
       <p className="small muted" style={{ marginBottom: 0 }}>
         From {profile.gamesAnalysed.toLocaleString()} analysed games and {profile.mistakes.toLocaleString()} mistakes;
         updated {formatDate(profile.computedAt)}. Severity is relative: 100 is your weakest area.
-        Tap Drill to train one; weaknesses without it are trained with positions from your own games, which arrive in a later step.
+        Tap Drill to train one. Weaknesses Lichess puzzles can&rsquo;t train use positions from your own games.
       </p>
     </>
   );

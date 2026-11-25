@@ -5,6 +5,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { Evaluation, Evaluator } from "../../src/lib/analysis/game";
 import type { Score } from "../../src/lib/analysis/eval";
+import { parseMultiPv, type TopMove } from "../../src/lib/analysis/accepted";
 
 export interface EngineOptions {
   path: string;
@@ -107,6 +108,20 @@ export class Stockfish implements Evaluator {
     // The best line should start with the move the engine picked.
     if (bestmove && bestmove !== "(none)" && result.pv[0] !== bestmove) result.pv = [bestmove];
     return result;
+  }
+
+  /** The engine's top `count` moves in a position, best first (MultiPV), at the same node budget. */
+  async topMoves(fen: string, count: number): Promise<TopMove[]> {
+    this.send(`setoption name MultiPV value ${count}`);
+    this.send(`position fen ${fen}`);
+    const lines = new Map<number, { depth: number; move: TopMove }>();
+    await this.until(`go nodes ${this.nodes}`, (line) => {
+      const info = parseMultiPv(line);
+      if (info && info.depth >= (lines.get(info.multipv)?.depth ?? 0)) lines.set(info.multipv, info);
+      return line.startsWith("bestmove");
+    });
+    this.send("setoption name MultiPV value 1");
+    return [...lines.entries()].sort((a, b) => a[0] - b[0]).map(([, l]) => l.move);
   }
 
   quit() {

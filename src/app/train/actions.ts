@@ -14,7 +14,7 @@ import { clientPuzzle, type ClientPuzzle } from "@/lib/training/client-puzzle";
 import { puzzleLevel } from "@/lib/training/rating";
 import { selectBlindspot } from "@/lib/training/blindspot";
 import { selectRunPuzzles } from "@/lib/training/run";
-import { selectPuzzles, trainingSource } from "@/lib/training/select";
+import { selectFor, weaknessFromKey } from "@/lib/training/sources";
 import { getUserIdForLogin } from "@/lib/user";
 import { rebuildProfiles } from "@/lib/weakness-store";
 
@@ -54,9 +54,10 @@ export async function saveAttempt(input: AttemptInput): Promise<ActionResult<Att
   }
 }
 
-const puzzleLabelsOf = (keys: string[]) => keys.slice(0, 8).flatMap((k) => {
-  const s = trainingSource(k.split("+"));
-  return s.kind === "puzzles" ? [s.puzzleLabels] : [];
+/** The trainable weaknesses behind some profile keys (at most eight). */
+const weaknessesOf = (keys: string[]) => keys.slice(0, 8).flatMap((k) => {
+  const w = weaknessFromKey(k);
+  return w ? [w] : [];
 });
 
 /**
@@ -69,14 +70,14 @@ export async function morePuzzles(
   try {
     const ctx = await signedIn();
     if (!ctx) return { ok: false, message: "Please sign in again." };
-    const weaknesses = puzzleLabelsOf(mode === "drill" ? weaknessKeys.slice(0, 1) : weaknessKeys);
+    const weaknesses = weaknessesOf(mode === "drill" ? weaknessKeys.slice(0, 1) : weaknessKeys);
     if (weaknesses.length === 0 && mode === "drill") {
-      return { ok: false, message: "This weakness can't be trained with Lichess puzzles yet." };
+      return { ok: false, message: "This weakness can't be trained yet." };
     }
     const level = await puzzleLevel(ctx.db, ctx.userId);
     const o = { userId: ctx.userId, level, exclude: exclude.slice(0, 500) };
     const puzzles = mode === "drill"
-      ? await selectPuzzles(ctx.db, { ...o, puzzleLabels: weaknesses[0], count: 5 })
+      ? await selectFor(ctx.db, weaknesses[0], { ...o, count: 5 })
       : await selectBlindspot(ctx.db, { ...o, weaknesses, count: 6 });
     return { ok: true, value: puzzles.map((p) => clientPuzzle(p, ctx.settings, level)) };
   } catch (e) {
@@ -92,7 +93,7 @@ export async function moreRunPuzzles(
   try {
     const ctx = await signedIn();
     if (!ctx) return { ok: false, message: "Please sign in again." };
-    const weaknesses = puzzleLabelsOf(weaknessKeys);
+    const weaknesses = weaknessesOf(weaknessKeys);
     const level = await puzzleLevel(ctx.db, ctx.userId);
     const puzzles = await selectRunPuzzles(ctx.db, {
       userId: ctx.userId, weaknesses, level, fromChunk: Math.max(0, Math.floor(fromChunk)), chunks: 2,

@@ -10,7 +10,8 @@
     "test": "vitest run",
     "import:games": "tsx scripts/import-games.ts",
     "build:puzzles": "tsx scripts/build-puzzles.ts",
-    "analyse:games": "tsx scripts/analyse-games.ts"
+    "analyse:games": "tsx scripts/analyse-games.ts",
+    "find:moves": "tsx scripts/find-moves.ts"
   },
   "dependencies": {
     "@lichess-org/chessground": "10.5.0",
