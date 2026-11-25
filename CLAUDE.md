@@ -7,7 +7,7 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 - Phase 1A (hello-world page deployed from GitHub to Vercel): done
 - Phase 1 (Foundations, including login): done. Sign-in live; games imported (daily import scheduled); puzzle store built (155,285 puzzles, every label covered; labels reviewed against the full Lichess database)
 - Phase 2 (Analysis): done. Migration 0004 applied; 12-month backlog analysed (684 blitz games, 2,560 mistakes); the first real profile looks sensible (a mix of single labels and endgame pairs). Daily analysis runs after the import
-- Phase 3 (Training): in progress. Decisions in SPEC.md (target time, repetition schedule, accepted moves; Blindspot rating calculated from Phase 3, shown in Phase 4). Steps 1–10 done; migration 0005 applied, 0006 to apply
+- Phase 3 (Training): in progress. Decisions in SPEC.md (target time, repetition schedule, accepted moves; Blindspot rating calculated from Phase 3, shown in Phase 4). Steps 1–11 done; migration 0005 applied, 0006 to apply
 
 ### Phase 3 plan (one pull request per step)
 
@@ -21,7 +21,7 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 8. Rush and Survival: **done** (`/train/rush`, `/train/survival`, ladder in `src/lib/training/run.ts`)
 9. Blindspot mode and the review queue: **done** (`/train/blindspot`, `src/lib/training/review.ts`, `blindspot.ts`)
 10. Positional "find the move" drills (analysis job stores accepted moves and subtlety; backfill): **done** in code (`scripts/find-moves.ts`, `src/lib/training/positions.ts`); needs migration 0006 applied, then an "Analyse games" run to fill the backlog
-11. Openings: chess.com names to Lichess `OpeningTags`
+11. Openings: chess.com names to Lichess `OpeningTags`: **done** (`src/lib/training/openings.ts`; GIN index on `opening_tags` in migration 0006)
 12. Review: positional pairs' 200 rule, tactics dominance; mark Phase 3 done
 
 Update this section when a phase is finished.
@@ -29,7 +29,7 @@ Update this section when a phase is finished.
 ### Notes for later phases
 
 - **Phase 3, ratings:** each attempt stores the puzzle's Lichess rating at the time (`puzzle_attempts.puzzle_rating`); the Blindspot rating must use that, not the current `puzzles.rating`.
-- **Phase 3, openings:** opening weaknesses are keyed by chess.com names (`src/lib/analysis/openings.ts`); training them needs a mapping to Lichess `OpeningTags`. Openings are not paired with other labels until then.
+- **Later, openings:** opening weaknesses are trained by Lichess `OpeningTags` (`src/lib/training/openings.ts`) but still not paired with other labels; pairing (e.g. forks in the Italian) would need `countPuzzles` to count by tag too.
 - **Phase 3, positional pairs:** a pair with a positional label (e.g. pawn decisions in the transition) counts the user's own mistakes as its "puzzles", so it rarely reaches 200. Revisit the 200 rule for those once real numbers exist.
 - **Keep an eye on:** each label is scored against its own family, so families with many labels (tactics) can reach higher scores than small ones (phases, position states). The first real profile was acceptable, but its top five were all tactics or mates (two paired with the endgame).
 - **After that:** consider a quarterly automatic puzzle rebuild (a `schedule` in `.github/workflows/build-puzzles.yml`, like the daily import), to pick up Lichess's monthly updates.

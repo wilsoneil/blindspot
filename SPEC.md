@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 25 Nov 2026 (Phase 3: "find the move" positions from the user's games)
+Last updated: 25 Nov 2026 (Phase 3: training openings with Lichess OpeningTags)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -95,6 +95,7 @@ Categories come from a fixed list; every one maps to a Lichess puzzle filter (or
 - **Black:** grouped by the user's own response (e.g. "my defence to 1.e4", "my setup against 1.d4"), not the opponent's opening, to pool small samples. v1 groups by White's first move and the user's reply to it (e.g. "Your reply to 1.e4: 1...c5")
 - **Rare openings** (a handful of games each) roll into one "Offbeat openings" bucket, which can itself surface as a weakness. An opening needs five games in the profile to stand on its own; rarer ones roll up first to the family (White's opening family, or all replies to that first move as Black), then into the bucket
 - Only mistakes in the opening and transition phases count towards the game's opening
+- **Training an opening** uses Lichess puzzles from games in that opening, found by their OpeningTags. White openings: chess.com's name written as a Lichess tag, trying the full variation first and then shorter names down to the family, filling up from broader names when the specific one runs short. Black replies: a fixed table of the Lichess families each reply leads to (e.g. 1.e4 c5 → Sicilian Defense; 1.e4 e5 → Italian, Ruy Lopez, Scotch and the other 1...e5 openings); an unlisted reply uses every family after White's first move. "Offbeat openings" pools too many openings to train
 
 ### Scoring method
 
@@ -112,7 +113,7 @@ The game score is blended with puzzle performance on the matching theme (solved 
 
 - **Clearly worse:** the pair's share of the user's mistake cost is at least 1.25 times what its two labels would give if unrelated (pulled towards 1 for small samples). Its score is then the broader label's score times that factor, and it takes the place of whichever of its two labels scores higher.
 - **Matching puzzles:** Lichess puzzles carrying both labels. When either label is positional (no Lichess theme), the user's own mistakes with both labels are counted instead, since those are the "find the move" positions that would train it.
-- Two labels from the same family, phase with endgame type, and openings are not paired in v1 (matching openings to Lichess puzzles comes with training in Phase 3).
+- Two labels from the same family, phase with endgame type, and openings are not paired in v1 (openings are trained by their own Lichess OpeningTags; pairing them with a tactic is a possible later addition).
 
 ## Training modes
 

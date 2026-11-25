@@ -156,6 +156,11 @@ export function fakeDb(tables: Record<string, Row[]>, opts: FakeDbOptions = {}) 
         filters.push((r) => vs.every((v) => (r[col] as unknown[]).includes(v)));
         return builder;
       },
+      overlaps(col: string, vs: unknown[]) {
+        entry.filters.push(`${col} overlaps ${vs.join(",")}`);
+        filters.push((r) => vs.some((v) => ((r[col] as unknown[]) ?? []).includes(v)));
+        return builder;
+      },
       gte(col: string, v: number | string) {
         entry.filters.push(`${col}>=${v}`);
         filters.push((r) => (r[col] as number | string) >= v);

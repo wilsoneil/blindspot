@@ -70,6 +70,8 @@ export interface SelectOptions {
   userId: string;
   /** Puzzle-store labels the puzzles must all carry (from trainingSource). */
   puzzleLabels: string[];
+  /** Lichess OpeningTags: the puzzles must carry at least one (opening weaknesses). */
+  openingTags?: string[];
   /** How many puzzles to return (fewer if not enough unseen ones exist). */
   count: number;
   level?: number;
@@ -99,7 +101,8 @@ export async function attemptedPuzzleIds(db: Pick<Db, "from">, userId: string): 
  * the narrowest rating window with enough of them, in random order.
  */
 export async function selectPuzzles(db: Pick<Db, "from">, o: SelectOptions): Promise<TrainingPuzzle[]> {
-  if (o.puzzleLabels.length === 0 || o.count <= 0) return [];
+  const tags = o.openingTags ?? [];
+  if ((o.puzzleLabels.length === 0 && tags.length === 0) || o.count <= 0) return [];
   const level = o.level ?? DEFAULT_LEVEL;
   const random = o.random ?? Math.random;
   const skip = new Set(o.attempted ?? await attemptedPuzzleIds(db, o.userId));
@@ -107,11 +110,19 @@ export async function selectPuzzles(db: Pick<Db, "from">, o: SelectOptions): Pro
 
   const pool = new Map<string, PuzzleDbRow>();
   for (const w of RATING_WINDOWS) {
-    const inWindow = <Q extends { gte: (c: string, v: number) => Q; lte: (c: string, v: number) => Q }>(q: Q) =>
-      Number.isFinite(w) ? q.gte("rating", level - w).lte("rating", level + w) : q;
+    type Filterable<Q> = {
+      gte: (c: string, v: number) => Q; lte: (c: string, v: number) => Q;
+      contains: (c: string, v: string[]) => Q; overlaps: (c: string, v: string[]) => Q;
+    };
+    const inWindow = <Q extends Filterable<Q>>(q: Q) => {
+      let f = Number.isFinite(w) ? q.gte("rating", level - w).lte("rating", level + w) : q;
+      if (o.puzzleLabels.length) f = f.contains("labels", o.puzzleLabels);
+      if (tags.length) f = f.overlaps("opening_tags", tags);
+      return f;
+    };
 
     const { count, error } = await inWindow(
-      db.from("puzzles").select("id", { count: "exact", head: true }).contains("labels", o.puzzleLabels),
+      db.from("puzzles").select("id", { count: "exact", head: true }),
     );
     if (error) throw new Error(`Could not count puzzles: ${error.message}`);
     const total = count ?? 0;
@@ -120,7 +131,7 @@ export async function selectPuzzles(db: Pick<Db, "from">, o: SelectOptions): Pro
     const offsets = sliceOffsets(total, random);
     for (const offset of offsets) {
       const { data, error: readErr } = await inWindow(
-        db.from("puzzles").select("id, fen, moves, rating, themes, labels").contains("labels", o.puzzleLabels),
+        db.from("puzzles").select("id, fen, moves, rating, themes, labels"),
       ).order("id").range(offset, offset + SLICE - 1);
       if (readErr) throw new Error(`Could not read puzzles: ${readErr.message}`);
       for (const row of data as PuzzleDbRow[]) if (!skip.has(row.id)) pool.set(row.id, row);

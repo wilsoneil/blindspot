@@ -30,7 +30,7 @@ export default async function DrillPage({ searchParams }: PageProps<"/train/dril
         <h1>Drill</h1>
         <p className="muted">
           {source.kind === "notYet" && source.reason === "opening"
-            ? "Opening weaknesses become trainable once openings are matched to Lichess puzzles (a later step)."
+            ? "This opening group can't be matched to Lichess puzzles (Offbeat openings pool too many different ones)."
             : "Choose a weakness to drill from the home page."}
         </p>
         {back}
@@ -41,13 +41,16 @@ export default async function DrillPage({ searchParams }: PageProps<"/train/dril
   const level = await puzzleLevel(ctx.db, ctx.userId); // the Blindspot rating: hidden until Phase 4
   const puzzles = await selectFor(ctx.db, weakness, { userId: ctx.userId, count: 5, level });
   const own = weakness.kind === "ownGames";
+  const opening = weakness.kind === "opening";
   return (
     <section className="card">
       <h1>{describeKey(weaknessKey)} <span className="pill">Drill</span></h1>
       <p className="small muted">
         {own
           ? "Positions from your own games where you went wrong. Find the move you missed: any move close to the engine's best counts."
-          : `Puzzles chosen for this weakness from your ${describeProfileKey(profileKey)} games.`}{" "}
+          : opening
+            ? "Lichess puzzles from games in this opening, so the typical tactics and plans become familiar."
+            : `Puzzles chosen for this weakness from your ${describeProfileKey(profileKey)} games.`}{" "}
         Take your time: wrong moves can be retried, but only a clean solve within the target time counts as solved.
       </p>
       {puzzles.length > 0 ? (
