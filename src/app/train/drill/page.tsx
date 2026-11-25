@@ -49,7 +49,7 @@ export default async function DrillPage({ searchParams }: PageProps<"/train/dril
       </p>
       {puzzles.length > 0 ? (
         <Drill
-          weaknessKey={weaknessKey}
+          weaknessKeys={[weaknessKey]}
           profileKey={profileKey}
           initial={puzzles.map((p) => clientPuzzle(p, ctx.settings, level))}
           engineDefault={ctx.settings.engineOnBoard}
