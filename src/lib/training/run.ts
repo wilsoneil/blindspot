@@ -43,7 +43,7 @@ export async function loadDueReviews(
   }
   if (mistakeIds.length) {
     const { data, error } = await db.from("mistakes")
-      .select("id, fen, labels, accepted_moves, subtlety, played_san, best_san, played_at")
+      .select("id, fen, labels, accepted_moves, subtlety, played_san, played_uci, refutation, best_san, played_at")
       .eq("user_id", userId).in("id", mistakeIds);
     if (error) throw new Error(`Could not read review positions: ${error.message}`);
     for (const m of data as Parameters<typeof positionFromMistake>[0][]) {

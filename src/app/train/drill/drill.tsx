@@ -91,6 +91,9 @@ export function Drill({ weaknessKey, profileKey, initial, engineDefault }: {
           // an own position's FEN is the user's move.
           orientation={(puzzle.fen.split(" ")[1] === "w") === !puzzle.position ? "black" : "white"}
           startPly={puzzle.position ? 0 : 1}
+          gameMove={puzzle.position
+            ? { uci: puzzle.position.playedUci, san: puzzle.position.playedSan, refutation: puzzle.position.refutation }
+            : undefined}
           engineDefault={engineDefault}
         />
       )}

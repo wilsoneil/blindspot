@@ -53,6 +53,9 @@ export interface PositionDetails {
   accepted: string[];
   /** What happened in the game, shown afterwards. */
   playedSan: string;
+  playedUci: string;
+  /** The opponent's best reply line after the move played (UCI), to see why it was a mistake. */
+  refutation: string[];
   bestSan: string;
   playedAt: string;
 }
