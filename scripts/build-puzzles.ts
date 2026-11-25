@@ -54,6 +54,10 @@ async function main() {
   let batch: PuzzleRow[] = [];
   const started = Date.now();
 
+  // How often each tactic and mate appears across the whole file (before any filtering):
+  // the "usual share" the weakness profile compares the user's tactic mistakes with.
+  const inFile = new Map<string, number>();
+
   let lines = 0;
   for await (const line of readLines(await openSource())) {
     lines++;
@@ -61,6 +65,7 @@ async function main() {
     // Keep reading to the end even once the store is full, so a program feeding
     // this script through a pipe isn't cut off mid-file (which would look like a failure).
     if (!puzzle) continue;
+    for (const l of puzzle.labels) inFile.set(l, (inFile.get(l) ?? 0) + 1);
     const decision = filter.decide(puzzle);
     report.record(puzzle, decision);
     if (filter.seen % 1_000_000 === 0) {
@@ -97,6 +102,15 @@ async function main() {
     console.log(`  ${label.name.padEnd(30)} ${n.toLocaleString().padStart(8)}${n === 0 ? "   <- none found: check the theme name" : ""}`);
   }
   printReport(filter, report);
+  printMotifFrequencies(inFile, filter.seen);
+}
+
+/** Ready to paste into src/lib/analysis/motif-frequency.ts. Public Lichess counts only. */
+function printMotifFrequencies(inFile: Map<string, number>, total: number) {
+  console.log(`\nMotif frequencies (every puzzle in the file, ${total.toLocaleString()} in all), for src/lib/analysis/motif-frequency.ts:`);
+  for (const label of LABELS) {
+    if (label.missedAllowed) console.log(`  ${label.id}: ${inFile.get(label.id) ?? 0},`);
+  }
 }
 
 main().catch((e) => {
