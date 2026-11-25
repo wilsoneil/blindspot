@@ -7,7 +7,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAppContext } from "@/lib/app-data";
 import {
-  MAX_PAIRS, MIN_GAMES, PAIR_MIN_GAMES, PAIR_MIN_LIFT, PAIR_MIN_PUZZLES, type PairOutcome,
+  MAX_PAIRS, MIN_GAMES, PAIR_MIN_GAMES, PAIR_MIN_LIFT, PAIR_MIN_PUZZLES, type PairCheck, type PairOutcome,
 } from "@/lib/analysis/profile";
 import { describeProfileKey, profileKeyForSetting, reviewProfile } from "@/lib/weakness-store";
 import { SetupNotice } from "../../setup-notice";
@@ -35,6 +35,35 @@ const OUTCOME: Record<PairOutcome, string> = {
   pairLimit: `Already ${MAX_PAIRS} stronger pairs`,
   outOfTop: "Passed, but not high enough",
 };
+
+const OUTCOME_ORDER: PairOutcome[] = [
+  "shown", "outOfTop", "pairLimit", "anotherPairBetter", "fewPositions", "notClearlyWorse", "parentNotInTop",
+];
+
+function PairTable({ pairs, empty, outcome = false }: { pairs: PairCheck[]; empty: string; outcome?: boolean }) {
+  if (pairs.length === 0) return <p className="small muted">{empty}</p>;
+  return (
+    <div className="table-wrap">
+      <table className="check-table">
+        <thead>
+          <tr><th>Pair</th><th>Games</th><th>Lift</th><th>Score</th><th>Positions</th>{outcome && <th>Outcome</th>}</tr>
+        </thead>
+        <tbody>
+          {pairs.map((p) => (
+            <tr key={p.key}>
+              <td>{p.name}{p.positional && <> <span className="pill">own</span></>}</td>
+              <td>{p.games}</td>
+              <td>{p.lift.toFixed(2)}</td>
+              <td>{p.score.toFixed(2)}</td>
+              <td>{p.positions.toLocaleString()}</td>
+              {outcome && <td>{OUTCOME[p.outcome]}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default async function ProfileCheckPage({ searchParams }: PageProps<"/settings/profile-check">) {
   const ctx = await getAppContext();
@@ -82,12 +111,13 @@ export default async function ProfileCheckPage({ searchParams }: PageProps<"/set
         <h2>Families</h2>
         <p className="small muted">
           Each category is scored against its own family (1 = your average for the family), so a family with many
-          categories can reach higher scores. &ldquo;Enough evidence&rdquo; = mistakes in at least {MIN_GAMES} games.
+          categories can reach higher scores. Labels: categories in the family. Evidence: those with mistakes in at least
+          {MIN_GAMES} games. Max: the highest score.
         </p>
         <div className="table-wrap">
           <table className="check-table">
             <thead>
-              <tr><th>Family</th><th>Categories</th><th>Enough evidence</th><th>Top 5</th><th>Top 8</th><th>Highest score</th></tr>
+              <tr><th>Family</th><th>Labels</th><th>Evidence</th><th>Top 5</th><th>Top 8</th><th>Max</th></tr>
             </thead>
             <tbody>
               {families.map((f) => (
@@ -108,32 +138,34 @@ export default async function ProfileCheckPage({ searchParams }: PageProps<"/set
       <section className="card">
         <h2>Pairs</h2>
         <p className="small muted">
-          Every pair with mistakes in at least {PAIR_MIN_GAMES} games, highest score first, with the first rule it
+          {pairs.length} pairs have mistakes in at least {PAIR_MIN_GAMES} games. Each is counted under the first rule it
           failed. A positional pair (one label with no Lichess theme) counts your own mistakes as its positions.
         </p>
-        {pairs.length === 0 ? (
-          <p className="muted">No pair has mistakes in {PAIR_MIN_GAMES} games yet.</p>
-        ) : (
-          <div className="table-wrap">
-            <table className="check-table">
-              <thead>
-                <tr><th>Pair</th><th>Games</th><th>Lift</th><th>Score</th><th>Puzzles / positions</th><th>Outcome</th></tr>
-              </thead>
-              <tbody>
-                {pairs.map((p) => (
-                  <tr key={p.key}>
-                    <td>{p.name}{p.positional && <> <span className="pill">own games</span></>}</td>
-                    <td>{p.games}</td>
-                    <td>{p.lift.toFixed(2)}</td>
-                    <td>{p.score.toFixed(2)}</td>
-                    <td>{p.positions.toLocaleString()}</td>
-                    <td>{OUTCOME[p.outcome]}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="table-wrap">
+          <table className="check-table">
+            <thead>
+              <tr><th>Outcome</th><th>Puzzle pairs</th><th>Positional</th></tr>
+            </thead>
+            <tbody>
+              {OUTCOME_ORDER.map((o) => {
+                const n = (positional: boolean) => pairs.filter((p) => p.outcome === o && p.positional === positional).length;
+                if (!n(true) && !n(false)) return null;
+                return <tr key={o}><td>{OUTCOME[o]}</td><td>{n(false)}</td><td>{n(true)}</td></tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style={{ marginTop: "1rem" }}>Stopped only by the {PAIR_MIN_PUZZLES} rule</h3>
+        <PairTable pairs={pairs.filter((p) => p.outcome === "fewPositions")} empty="None." />
+
+        <h3 style={{ marginTop: "1rem" }}>Shown in the top list</h3>
+        <PairTable pairs={pairs.filter((p) => p.outcome === "shown")} empty="None." />
+
+        <details style={{ marginTop: "1rem" }}>
+          <summary className="small">All {pairs.length} pairs</summary>
+          <PairTable pairs={pairs} empty="None." outcome />
+        </details>
       </section>
     </>
   );
