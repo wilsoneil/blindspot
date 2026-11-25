@@ -63,6 +63,8 @@ export interface SelectOptions {
   level?: number;
   /** Puzzles already served in this session, on top of the ones with attempts. */
   exclude?: Iterable<string>;
+  /** The user's attempted puzzle ids, if already loaded (saves reading them again). */
+  attempted?: Set<string>;
   /** Random number source, replaceable in tests. */
   random?: () => number;
 }
@@ -88,7 +90,7 @@ export async function selectPuzzles(db: Pick<Db, "from">, o: SelectOptions): Pro
   if (o.puzzleLabels.length === 0 || o.count <= 0) return [];
   const level = o.level ?? DEFAULT_LEVEL;
   const random = o.random ?? Math.random;
-  const skip = await attemptedPuzzleIds(db, o.userId);
+  const skip = new Set(o.attempted ?? await attemptedPuzzleIds(db, o.userId));
   for (const id of o.exclude ?? []) skip.add(id);
 
   const pool = new Map<string, PuzzleDbRow>();

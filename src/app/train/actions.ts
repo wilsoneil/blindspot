@@ -12,6 +12,7 @@ import { settingsFromRow, type Settings, type SettingsRow } from "@/lib/settings
 import { AttemptError, recordPuzzleAttempt, type AttemptInput, type AttemptOutcome } from "@/lib/training/attempts";
 import { clientPuzzle, type ClientPuzzle } from "@/lib/training/client-puzzle";
 import { puzzleLevel } from "@/lib/training/rating";
+import { selectRunPuzzles } from "@/lib/training/run";
 import { selectPuzzles, trainingSource } from "@/lib/training/select";
 import { getUserIdForLogin } from "@/lib/user";
 import { rebuildProfiles } from "@/lib/weakness-store";
@@ -66,6 +67,29 @@ export async function morePuzzles(weaknessKey: string, exclude: string[]): Promi
     return { ok: true, value: puzzles.map((p) => clientPuzzle(p, ctx.settings, level)) };
   } catch (e) {
     console.error("Loading puzzles failed", e);
+    return { ok: false, message: "Couldn't load more puzzles." };
+  }
+}
+
+/** The next chunks of a Rush or Survival run. `weaknessKeys` is the run's weakness order. */
+export async function moreRunPuzzles(
+  weaknessKeys: string[], fromChunk: number, exclude: string[],
+): Promise<ActionResult<ClientPuzzle[]>> {
+  try {
+    const ctx = await signedIn();
+    if (!ctx) return { ok: false, message: "Please sign in again." };
+    const weaknesses = weaknessKeys.slice(0, 8).flatMap((k) => {
+      const s = trainingSource(k.split("+"));
+      return s.kind === "puzzles" ? [s.puzzleLabels] : [];
+    });
+    const level = await puzzleLevel(ctx.db, ctx.userId);
+    const puzzles = await selectRunPuzzles(ctx.db, {
+      userId: ctx.userId, weaknesses, level, fromChunk: Math.max(0, Math.floor(fromChunk)), chunks: 2,
+      exclude: exclude.slice(0, 1000),
+    });
+    return { ok: true, value: puzzles.map((p) => clientPuzzle(p, ctx.settings, level)) };
+  } catch (e) {
+    console.error("Loading run puzzles failed", e);
     return { ok: false, message: "Couldn't load more puzzles." };
   }
 }

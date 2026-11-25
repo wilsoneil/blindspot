@@ -312,3 +312,12 @@ ol.weaknesses {
   border-radius: 999px;
   background: var(--accent);
 }
+
+.modes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0.75rem;
+}
+.modes .button { text-decoration: none; }
