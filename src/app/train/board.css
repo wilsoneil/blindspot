@@ -56,3 +56,41 @@
   color: var(--text);
   cursor: pointer;
 }
+
+/* Analysis board */
+.analysis-controls {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+.analysis-controls button {
+  min-width: 2.75rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+}
+.analysis-controls button:disabled { opacity: 0.4; cursor: default; }
+
+.eval {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.eval-bar {
+  flex: 1;
+  height: 0.6rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #222;
+  border: 1px solid var(--border);
+}
+.eval-white { height: 100%; background: #f2f2f2; transition: width 0.3s; }
+.eval-score { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 3.2rem; text-align: right; }
+.engine-lines { margin-top: 0.75rem; }
+.engine-lines p { margin: 0 0 0.3rem; overflow-wrap: anywhere; }

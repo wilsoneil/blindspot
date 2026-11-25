@@ -50,6 +50,7 @@ export default async function DrillPage({ searchParams }: PageProps<"/train/dril
           weaknessKey={weaknessKey}
           profileKey={profileKey}
           initial={puzzles.map((p) => clientPuzzle(p, ctx.settings, DEFAULT_LEVEL))}
+          engineDefault={ctx.settings.engineOnBoard}
         />
       ) : (
         <p className="muted">You&rsquo;ve attempted every puzzle for this weakness. Impressive.</p>

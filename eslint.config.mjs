@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Third-party engine build, copied unchanged (public/stockfish/README.md).
+    "public/stockfish/**",
   ]),
 ]);
 

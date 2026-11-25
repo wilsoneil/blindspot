@@ -4,9 +4,12 @@ import { useRef, useState } from "react";
 import type { AttemptOutcome } from "@/lib/training/attempts";
 import type { ClientPuzzle } from "@/lib/training/client-puzzle";
 import { morePuzzles, saveAttempt } from "../actions";
+import { AnalysisBoard } from "../analysis-board";
 import { PuzzleBoard, type PuzzleResult } from "../puzzle-board";
 
-export function Drill({ weaknessKey, profileKey, initial }: { weaknessKey: string; profileKey: string; initial: ClientPuzzle[] }) {
+export function Drill({ weaknessKey, profileKey, initial, engineDefault }: {
+  weaknessKey: string; profileKey: string; initial: ClientPuzzle[]; engineDefault: boolean;
+}) {
   const [queue, setQueue] = useState(initial);
   const [index, setIndex] = useState(0);
   const [round, setRound] = useState(0); // bumps to replay the same puzzle
@@ -14,6 +17,7 @@ export function Drill({ weaknessKey, profileKey, initial }: { weaknessKey: strin
   const [result, setResult] = useState<PuzzleResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [analysing, setAnalysing] = useState(false);
   const sessionId = useRef<number | null>(null);
   const seen = useRef(new Set(initial.map((p) => p.id)));
   const puzzle = queue[index];
@@ -42,6 +46,7 @@ export function Drill({ weaknessKey, profileKey, initial }: { weaknessKey: strin
   }
 
   function reset() {
+    setAnalysing(false);
     setOutcome(null);
     setResult(null);
     setMessage(null);
@@ -59,6 +64,16 @@ export function Drill({ weaknessKey, profileKey, initial }: { weaknessKey: strin
 
   return (
     <>
+      {analysing && (
+        <AnalysisBoard
+          fen={puzzle.fen}
+          line={puzzle.moves}
+          // The puzzle's FEN is before the opponent's setup move, so the user plays the other side.
+          orientation={puzzle.fen.split(" ")[1] === "w" ? "black" : "white"}
+          engineDefault={engineDefault}
+        />
+      )}
+      <div hidden={analysing}>
       <PuzzleBoard
         key={`${puzzle.id}-${round}`}
         fen={puzzle.fen}
@@ -68,10 +83,14 @@ export function Drill({ weaknessKey, profileKey, initial }: { weaknessKey: strin
         allowReveal
         onFinish={onFinish}
       />
+      </div>
       {result && (
         <div className="save-bar" style={{ marginTop: "0.75rem", flexWrap: "wrap" }}>
           <button type="button" className="button" onClick={next}>Next puzzle</button>
           <button type="button" className="link-button" onClick={() => { reset(); setRound((n) => n + 1); }}>Try again</button>
+          <button type="button" className="link-button" onClick={() => setAnalysing((a) => !a)}>
+            {analysing ? "Close analysis" : "Analyse"}
+          </button>
           <span className="small muted">
             {outcome && !outcome.firstAttempt ? "Repeat: trains, but doesn't count. " : ""}
             {outcome ? `Session: ${outcome.session.solved} of ${outcome.session.attempted} solved.` : ""}
