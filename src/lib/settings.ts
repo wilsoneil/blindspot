@@ -13,7 +13,6 @@ export interface Settings {
   halfLifeDays: number;
   historyMonths: number | null; // null = all games
   targetTime: TargetTime;
-  rushMinutes: 3 | 5 | 10;
   survivalLives: number;
   engineOnBoard: boolean;
   theme: ThemeId;
@@ -30,7 +29,6 @@ export const DEFAULT_SETTINGS: Settings = {
   halfLifeDays: 60,
   historyMonths: 12,
   targetTime: "normal",
-  rushMinutes: 5,
   survivalLives: 3,
   engineOnBoard: false,
   theme: "slate",
@@ -93,9 +91,6 @@ export function parseSettingsForm(form: FormData): Settings {
   const targetTime = String(form.get("targetTime"));
   if (!["stricter", "normal", "looser"].includes(targetTime)) throw new SettingsError("Unknown target time.");
 
-  const rushMinutes = int(form.get("rushMinutes"), 3, 10, "Rush length");
-  if (![3, 5, 10].includes(rushMinutes)) throw new SettingsError("Rush length must be 3, 5 or 10 minutes.");
-
   const theme = String(form.get("theme"));
   if (!(THEME_IDS as readonly string[]).includes(theme)) throw new SettingsError("Unknown theme.");
 
@@ -112,7 +107,6 @@ export function parseSettingsForm(form: FormData): Settings {
     halfLifeDays: int(form.get("halfLifeDays"), 14, 365, "Recency half-life"),
     historyMonths,
     targetTime: targetTime as TargetTime,
-    rushMinutes: rushMinutes as 3 | 5 | 10,
     survivalLives: int(form.get("survivalLives"), 1, 5, "Survival lives"),
     engineOnBoard: form.get("engineOnBoard") === "on",
     theme: theme as ThemeId,
@@ -134,7 +128,7 @@ export interface SettingsRow {
   half_life_days: number;
   history_months: number | null;
   target_time: string;
-  rush_minutes: number;
+  // rush_minutes (0001) is no longer used: Rush is always 5 minutes (RUSH_MINUTES, src/app/train/mixed-page.tsx).
   survival_lives: number;
   engine_on_board: boolean;
   theme: string;
@@ -152,7 +146,6 @@ export function settingsFromRow(row: SettingsRow): Settings {
     halfLifeDays: row.half_life_days,
     historyMonths: row.history_months,
     targetTime: row.target_time as TargetTime,
-    rushMinutes: row.rush_minutes as 3 | 5 | 10,
     survivalLives: row.survival_lives,
     engineOnBoard: row.engine_on_board,
     theme: (THEME_IDS as readonly string[]).includes(row.theme) ? (row.theme as ThemeId) : DEFAULT_SETTINGS.theme,
@@ -171,7 +164,6 @@ export function settingsToRow(s: Settings): SettingsRow {
     half_life_days: s.halfLifeDays,
     history_months: s.historyMonths,
     target_time: s.targetTime,
-    rush_minutes: s.rushMinutes,
     survival_lives: s.survivalLives,
     engine_on_board: s.engineOnBoard,
     theme: s.theme,

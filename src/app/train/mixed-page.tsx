@@ -13,10 +13,15 @@ import { Run } from "./run";
 
 /** Rush always ends after this many failed puzzles (or when the clock runs out). */
 export const RUSH_LIVES = 3;
+/**
+ * Rush is always this long, so scores compare (SPEC.md -> "Run stats"). A length setting
+ * would need runs to record their length (a database change) to keep the stats fair.
+ */
+export const RUSH_MINUTES = 5;
 
 const TEXT = {
-  rush: (s: { rushMinutes: number }) =>
-    `As many puzzles as you can in ${s.rushMinutes} minutes, getting harder as you go. A wrong move ends that puzzle; ${RUSH_LIVES} failed puzzles end the rush.`,
+  rush: () =>
+    `As many puzzles as you can in ${RUSH_MINUTES} minutes, getting harder as you go. A wrong move ends that puzzle; ${RUSH_LIVES} failed puzzles end the rush.`,
   survival: (s: { survivalLives: number }) =>
     `Puzzles keep coming, getting harder, until you've failed ${s.survivalLives} of them.`,
 };
@@ -55,7 +60,7 @@ export async function MixedModePage({ mode, tc }: { mode: "rush" | "survival"; t
         profileKey={profileKey}
         weaknessKeys={weaknesses.map((w) => w.key)}
         initial={puzzles.map((p) => clientPuzzle(p, ctx.settings, level))}
-        rushMs={ctx.settings.rushMinutes * 60_000}
+        rushMs={RUSH_MINUTES * 60_000}
         lives={mode === "rush" ? RUSH_LIVES : ctx.settings.survivalLives}
         stats={stats}
         intro={`${TEXT[mode](ctx.settings)} Puzzles come from all your top weaknesses, mixed with earlier misses that are due for another look.`}
