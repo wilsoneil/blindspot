@@ -23,7 +23,7 @@ export default async function BlindspotPage({ searchParams }: PageProps<"/train/
   const weaknesses = mixedWeaknesses(profile?.top ?? [], ctx.settings.weaknessesShown);
   const level = await puzzleLevel(ctx.db, ctx.userId);
   const puzzles = await selectBlindspot(ctx.db, {
-    userId: ctx.userId, weaknesses: weaknesses.map((w) => w.puzzleLabels), level, count: 6,
+    userId: ctx.userId, weaknesses, level, count: 6,
   });
 
   return (
@@ -44,7 +44,7 @@ export default async function BlindspotPage({ searchParams }: PageProps<"/train/
       ) : (
         <p className="muted">
           {weaknesses.length === 0
-            ? "None of your top weaknesses can be trained with Lichess puzzles yet."
+            ? "None of your top weaknesses can be trained yet."
             : "No puzzles available right now."}
         </p>
       )}

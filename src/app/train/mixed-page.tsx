@@ -32,7 +32,7 @@ export async function MixedModePage({ mode, tc }: { mode: "rush" | "survival"; t
     return (
       <section className="card">
         <h1>{title}</h1>
-        <p className="muted">None of your top weaknesses can be trained with Lichess puzzles yet.</p>
+        <p className="muted">None of your top weaknesses can be trained yet.</p>
         {back}
       </section>
     );
@@ -40,7 +40,7 @@ export async function MixedModePage({ mode, tc }: { mode: "rush" | "survival"; t
 
   const level = await puzzleLevel(ctx.db, ctx.userId);
   const puzzles = await selectRunPuzzles(ctx.db, {
-    userId: ctx.userId, weaknesses: weaknesses.map((w) => w.puzzleLabels), level, fromChunk: 0, chunks: 2,
+    userId: ctx.userId, weaknesses, level, fromChunk: 0, chunks: 2,
   });
   return (
     <section className="card">

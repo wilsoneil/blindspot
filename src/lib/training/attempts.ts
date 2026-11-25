@@ -15,7 +15,9 @@ export type Mode = (typeof MODES)[number];
 export const MAX_SOLVE_MS = 60 * 60 * 1000;
 
 export interface AttemptInput {
-  puzzleId: string;
+  /** A Lichess puzzle, or (mistakeId) a "find the move" position from the user's own game. */
+  puzzleId?: string;
+  mistakeId?: number;
   /** The session this attempt belongs to; null starts a new one. */
   sessionId: number | null;
   mode: Mode;
@@ -59,18 +61,40 @@ export async function startSession(
   return (data as { id: number }).id;
 }
 
-/** Saves one attempt at a Lichess puzzle and updates its session's tally. */
+/** What was attempted: its labels, rating (Lichess puzzles only) and moves to play. */
+type Item = { column: "puzzle_id" | "mistake_id"; id: string | number; labels: string[]; rating: number | null; userMoves: number };
+
+async function loadItem(db: Pick<Db, "from">, userId: string, input: AttemptInput): Promise<Item> {
+  if (typeof input.mistakeId === "number") {
+    // The user's own position: it must be one of their mistakes.
+    const { data, error } = await db.from("mistakes")
+      .select("id, labels").eq("id", input.mistakeId).eq("user_id", userId).maybeSingle();
+    check(error, "read the position");
+    if (!data) throw new AttemptError("That position isn't one of yours.");
+    const m = data as { id: number; labels: string[] };
+    return { column: "mistake_id", id: m.id, labels: m.labels, rating: null, userMoves: 1 };
+  }
+  if (typeof input.puzzleId !== "string") throw new AttemptError("Bad attempt data.");
+  const { data, error } = await db.from("puzzles")
+    .select("id, moves, rating, labels").eq("id", input.puzzleId).maybeSingle();
+  check(error, "read the puzzle");
+  if (!data) throw new AttemptError("That puzzle isn't in the store.");
+  const p = data as { id: string; moves: string; rating: number; labels: string[] };
+  return { column: "puzzle_id", id: p.id, labels: p.labels, rating: p.rating, userMoves: p.moves.split(" ").filter(Boolean).length / 2 };
+}
+
+/**
+ * Saves one attempt at a Lichess puzzle or one of the user's own positions, and updates its
+ * session's tally and the review queue. Own positions never count towards the rating
+ * (they have no puzzle rating), but are logged the same way.
+ */
 export async function recordPuzzleAttempt(
   db: Pick<Db, "from">, userId: string, settings: Settings, input: AttemptInput, level: number,
 ): Promise<AttemptOutcome> {
   if (!MODES.includes(input.mode)) throw new AttemptError("Unknown training mode.");
   if (!Number.isFinite(input.solveMs) || !Number.isFinite(input.wrongMoves)) throw new AttemptError("Bad attempt data.");
 
-  const { data: puzzle, error: puzzleErr } = await db.from("puzzles")
-    .select("id, moves, rating, labels").eq("id", input.puzzleId).maybeSingle();
-  check(puzzleErr, "read the puzzle");
-  if (!puzzle) throw new AttemptError("That puzzle isn't in the store.");
-  const p = puzzle as { id: string; moves: string; rating: number; labels: string[] };
+  const p = await loadItem(db, userId, input);
 
   // The session must be the user's own; otherwise start a new one.
   let sessionId = input.sessionId;
@@ -82,19 +106,19 @@ export async function recordPuzzleAttempt(
   }
   sessionId ??= await startSession(db, userId, input);
 
-  const userMoves = p.moves.split(" ").filter(Boolean).length / 2;
-  const targetMs = targetTimeMs({ userMoves, puzzleRating: p.rating, level, setting: settings.targetTime });
+  // Own positions have no rating, so they never get the "well above your level" extra time.
+  const targetMs = targetTimeMs({ userMoves: p.userMoves, puzzleRating: p.rating ?? level, level, setting: settings.targetTime });
   const solveMs = Math.min(MAX_SOLVE_MS, Math.max(0, Math.round(input.solveMs)));
   const retries = Math.max(0, Math.round(input.wrongMoves));
   const correct = input.solved && !input.revealed && retries === 0;
   const fullySolved = correct && solveMs <= targetMs;
 
   const { data: earlier, error: earlierErr } = await db.from("puzzle_attempts")
-    .select("id").eq("user_id", userId).eq("puzzle_id", p.id).limit(1);
+    .select("id").eq("user_id", userId).eq(p.column, p.id).limit(1);
   check(earlierErr, "read earlier attempts");
 
   const row = (first: boolean) => ({
-    user_id: userId, session_id: sessionId, mode: input.mode, puzzle_id: p.id, labels: p.labels,
+    user_id: userId, session_id: sessionId, mode: input.mode, [p.column]: p.id, labels: p.labels,
     puzzle_rating: p.rating, first_attempt: first, correct, solve_ms: solveMs, target_ms: targetMs,
     retries, revealed: input.revealed,
   });
@@ -118,7 +142,8 @@ export async function recordPuzzleAttempt(
     .update({ ...session, ended_at: new Date().toISOString() }).eq("id", sessionId);
   check(updErr, "update the training session");
 
-  const review = await updateReview(db, userId, p.id, fullySolved);
+  const review = await updateReview(db, userId,
+    p.column === "puzzle_id" ? { puzzleId: p.id as string } : { mistakeId: p.id as number }, fullySolved);
 
   return { sessionId, firstAttempt, correct, fullySolved, targetMs, session, review };
 }

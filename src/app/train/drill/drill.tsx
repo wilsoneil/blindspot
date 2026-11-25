@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { AttemptOutcome } from "@/lib/training/attempts";
-import type { ClientPuzzle } from "@/lib/training/client-puzzle";
+import { attemptRef, type ClientPuzzle } from "@/lib/training/client-puzzle";
 import { morePuzzles, saveAttempt } from "../actions";
 import { AnalysisBoard } from "../analysis-board";
 import { PuzzleBoard, type PuzzleResult } from "../puzzle-board";
@@ -47,7 +47,7 @@ export function Drill({ mode = "drill", weaknessKeys, profileKey, initial, engin
   async function onFinish(r: PuzzleResult) {
     setResult(r);
     const saved = await saveAttempt({
-      puzzleId: puzzle.id, sessionId: sessionId.current, mode, profileKey,
+      ...attemptRef(puzzle), sessionId: sessionId.current, mode, profileKey,
       weaknessKey: mode === "drill" ? weaknessKeys[0] : null,
       solved: r.solved, solveMs: r.solveMs, wrongMoves: r.wrongMoves, revealed: r.revealed,
     });
@@ -90,9 +90,11 @@ export function Drill({ mode = "drill", weaknessKeys, profileKey, initial, engin
       {analysing && (
         <AnalysisBoard
           fen={puzzle.fen}
-          line={puzzle.moves}
-          // The puzzle's FEN is before the opponent's setup move, so the user plays the other side.
-          orientation={puzzle.fen.split(" ")[1] === "w" ? "black" : "white"}
+          line={puzzle.position ? puzzle.position.accepted.slice(0, 1) : puzzle.moves}
+          // A puzzle's FEN is before the opponent's setup move, so the user plays the other side;
+          // an own position's FEN is the user's move.
+          orientation={(puzzle.fen.split(" ")[1] === "w") === !puzzle.position ? "black" : "white"}
+          startPly={puzzle.position ? 0 : 1}
           engineDefault={engineDefault}
         />
       )}
@@ -101,6 +103,7 @@ export function Drill({ mode = "drill", weaknessKeys, profileKey, initial, engin
         key={`${puzzle.id}-${round}`}
         fen={puzzle.fen}
         moves={puzzle.moves}
+        accepted={puzzle.position?.accepted}
         targetMs={puzzle.targetMs}
         onWrong="retry"
         allowReveal
@@ -124,8 +127,21 @@ export function Drill({ mode = "drill", weaknessKeys, profileKey, initial, engin
       {message && <p className="small message-error" style={{ marginTop: "0.5rem" }}>{message}</p>}
       <p className="small muted" style={{ marginTop: "0.75rem" }}>
         {puzzle.review && <span className="pill" style={{ marginRight: "0.4rem" }}>Review</span>}
-        Lichess puzzle{" "}
-        <a href={`https://lichess.org/training/${puzzle.id}`} target="_blank" rel="noreferrer">{puzzle.id}</a>, rated {puzzle.rating}.
+        {puzzle.position ? (
+          result ? (
+            <>
+              From your game on {new Date(puzzle.position.playedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}:
+              you played {puzzle.position.playedSan}; the engine&rsquo;s choice was {puzzle.position.bestSan}.
+            </>
+          ) : (
+            <>A position from one of your own games. Find the best move.</>
+          )
+        ) : (
+          <>
+            Lichess puzzle{" "}
+            <a href={`https://lichess.org/training/${puzzle.id}`} target="_blank" rel="noreferrer">{puzzle.id}</a>, rated {puzzle.rating}.
+          </>
+        )}
       </p>
     </>
   );

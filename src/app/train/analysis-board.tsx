@@ -23,6 +23,8 @@ export interface AnalysisBoardProps {
   orientation: "white" | "black";
   /** Engine on when the board opens (the "Engine on analysis board" setting). */
   engineDefault: boolean;
+  /** Where to start in the line (default 1: after a puzzle's setup move). */
+  startPly?: number;
 }
 
 /** The position after the first `ply` moves of a line, plus the last move played. */
@@ -42,11 +44,11 @@ function dests(chess: Chess): Map<Key, Key[]> {
   return out;
 }
 
-export function AnalysisBoard({ fen, line: puzzleLine, orientation, engineDefault }: AnalysisBoardProps) {
+export function AnalysisBoard({ fen, line: puzzleLine, orientation, engineDefault, startPly = 1 }: AnalysisBoardProps) {
   const el = useRef<HTMLDivElement>(null);
   const ground = useRef<Api | null>(null);
   const [line, setLine] = useState(puzzleLine);
-  const [ply, setPly] = useState(1); // start at the puzzle position, after the setup move
+  const [ply, setPly] = useState(startPly); // the puzzle position: after the setup move, if any
   const [engineOn, setEngineOn] = useState(engineDefault);
   const position = useMemo(() => replay(fen, line, ply), [fen, line, ply]);
   const positionFen = position.chess.fen();
@@ -147,7 +149,7 @@ export function AnalysisBoard({ fen, line: puzzleLine, orientation, engineDefaul
       {offLine && (
         <p className="small muted" style={{ margin: "0.5rem 0 0" }}>
           Exploring your own line.{" "}
-          <button type="button" className="link-button" onClick={() => { setLine(puzzleLine); setPly(1); }}>Back to the puzzle line</button>
+          <button type="button" className="link-button" onClick={() => { setLine(puzzleLine); setPly(startPly); }}>Back to the puzzle line</button>
         </p>
       )}
       {engineOn && (

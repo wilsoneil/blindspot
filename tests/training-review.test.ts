@@ -3,6 +3,9 @@ import { selectBlindspot } from "../src/lib/training/blindspot";
 import { dueReviews, INTERVAL_DAYS, nextReview, updateReview } from "../src/lib/training/review";
 import { fakeDb } from "./fake-db";
 
+/** A weakness trained by Lichess puzzles with one label. */
+const W = (label: string) => ({ key: `${label}:missed`, kind: "puzzles" as const, puzzleLabels: [label] });
+
 const NOW = new Date("2026-11-25T12:00:00Z");
 const DAY = 86_400_000;
 const days = (n: number) => new Date(NOW.getTime() + n * DAY);
@@ -38,21 +41,21 @@ describe("updateReview and dueReviews", () => {
   it("adds, advances, resets and removes queue entries, per user", async () => {
     const tables = { review_queue: [] as Record<string, unknown>[] };
     const { db } = fakeDb(tables);
-    await updateReview(db, "u1", "p1", false, NOW);
-    await updateReview(db, "u2", "p1", false, NOW);
+    await updateReview(db, "u1", { puzzleId: "p1" }, false, NOW);
+    await updateReview(db, "u2", { puzzleId: "p1" }, false, NOW);
     expect(tables.review_queue).toHaveLength(2);
     expect(tables.review_queue[0]).toMatchObject({ user_id: "u1", puzzle_id: "p1", step: 0, due_at: days(1).toISOString() });
 
     expect(await dueReviews(db, "u1", 10, NOW)).toEqual([]);
-    expect(await dueReviews(db, "u1", 10, days(1))).toEqual(["p1"]);
+    expect(await dueReviews(db, "u1", 10, days(1))).toEqual([{ puzzleId: "p1" }]);
 
-    expect((await updateReview(db, "u1", "p1", true, days(1))).kind).toBe("advanced");
+    expect((await updateReview(db, "u1", { puzzleId: "p1" }, true, days(1))).kind).toBe("advanced");
     expect(tables.review_queue[0]).toMatchObject({ step: 1, due_at: days(4).toISOString() });
-    expect((await updateReview(db, "u1", "p1", false, days(2))).kind).toBe("reset");
+    expect((await updateReview(db, "u1", { puzzleId: "p1" }, false, days(2))).kind).toBe("reset");
     expect(tables.review_queue[0]).toMatchObject({ step: 0, due_at: days(3).toISOString() });
 
     tables.review_queue[0].step = 3;
-    expect((await updateReview(db, "u1", "p1", true, days(5))).kind).toBe("graduated");
+    expect((await updateReview(db, "u1", { puzzleId: "p1" }, true, days(5))).kind).toBe("graduated");
     expect(tables.review_queue.map((r) => r.user_id)).toEqual(["u2"]);
   });
 });
@@ -67,13 +70,13 @@ describe("selectBlindspot", () => {
     puzzle("old1", ["skewer"]), puzzle("old2", ["skewer"]), puzzle("old3", ["fork"]), puzzle("old4", ["pin"]),
   ];
   const queue = ["old1", "old2", "old3", "old4"].map((id, i) => ({
-    id: i + 1, user_id: "u1", puzzle_id: id, step: 0, due_at: days(i < 3 ? -1 : 2).toISOString(),
+    id: i + 1, user_id: "u1", puzzle_id: id, mistake_id: null, step: 0, due_at: days(i < 3 ? -1 : 2).toISOString(),
   }));
   const attempts = ["old1", "old2", "old3", "old4"].map((id, i) => ({ id: i + 1, user_id: "u1", puzzle_id: id }));
 
   it("mixes due reviews (at most half) with new puzzles from every weakness", async () => {
     const { db } = fakeDb({ puzzles, review_queue: queue, puzzle_attempts: attempts });
-    const got = await selectBlindspot(db, { userId: "u1", weaknesses: [["fork"], ["pin"]], level: 1500, count: 6, now: NOW });
+    const got = await selectBlindspot(db, { userId: "u1", weaknesses: [W("fork"), W("pin")], level: 1500, count: 6, now: NOW });
     expect(got).toHaveLength(6);
     const reviews = got.filter((p) => p.review).map((p) => p.id).sort();
     expect(reviews).toEqual(["old1", "old2", "old3"]); // old4 isn't due yet
@@ -85,7 +88,7 @@ describe("selectBlindspot", () => {
   it("skips reviews already served this session, and caps them when many are due", async () => {
     const { db } = fakeDb({ puzzles, review_queue: queue, puzzle_attempts: attempts });
     const got = await selectBlindspot(db, {
-      userId: "u1", weaknesses: [["fork"], ["pin"]], level: 1500, count: 2, exclude: ["old1"], now: NOW,
+      userId: "u1", weaknesses: [W("fork"), W("pin")], level: 1500, count: 2, exclude: ["old1"], now: NOW,
     });
     expect(got.filter((p) => p.review).map((p) => p.id)).toEqual(["old2"]); // half of 2
     expect(got).toHaveLength(2);

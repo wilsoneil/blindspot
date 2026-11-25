@@ -6,7 +6,8 @@
 // each of the next few weaknesses in turn, so every chunk mixes weaknesses.
 
 import type { Db } from "../db";
-import { attemptedPuzzleIds, selectPuzzles, trainingSource, type TrainingPuzzle } from "./select";
+import { attemptedPuzzleIds, type TrainingPuzzle } from "./select";
+import { selectFor, weaknessFromKey, type Weakness } from "./sources";
 
 export const LADDER_START = -300;
 export const LADDER_STEP = 25;
@@ -27,8 +28,8 @@ export function chunkWeaknesses(weaknessCount: number, chunk: number): number[] 
 
 export interface RunSelect {
   userId: string;
-  /** Puzzle-store labels for each trainable top weakness, in a fixed (shuffled) order. */
-  weaknesses: string[][];
+  /** The trainable top weaknesses, in a fixed (shuffled) order. */
+  weaknesses: Weakness[];
   level: number;
   /** First chunk to fetch, and how many. */
   fromChunk: number;
@@ -46,9 +47,8 @@ export async function selectRunPuzzles(db: Pick<Db, "from">, o: RunSelect): Prom
   for (let c = o.fromChunk; c < o.fromChunk + o.chunks; c++) {
     const centre = ladderRating(o.level, c * CHUNK + (CHUNK - 1) / 2);
     const picks = await Promise.all(chunkWeaknesses(o.weaknesses.length, c).map((w) =>
-      selectPuzzles(db, {
-        userId: o.userId, puzzleLabels: o.weaknesses[w], count: PER_WEAKNESS + 1, level: Math.round(centre),
-        attempted, exclude: taken, random: o.random,
+      selectFor(db, o.weaknesses[w], {
+        userId: o.userId, count: PER_WEAKNESS + 1, level: o.level, near: centre, attempted, exclude: taken, random: o.random,
       })));
     // Take them in turn from each weakness, so a short list doesn't crowd out the others.
     // The same puzzle can carry two weaknesses' labels: keep it once.
@@ -73,10 +73,13 @@ export function shuffled<T>(items: T[], random: () => number = Math.random): T[]
   return a;
 }
 
-/** The top weaknesses a mixed mode draws on: those shown on the home page that Lichess puzzles train. */
-export function mixedWeaknesses(top: { key: string; labels: string[] }[], shown: number): { key: string; puzzleLabels: string[] }[] {
+/**
+ * The top weaknesses a mixed mode draws on: those shown on the home page that can be trained
+ * (Lichess puzzles, or positions from the user's own games).
+ */
+export function mixedWeaknesses(top: { key: string }[], shown: number): Weakness[] {
   return top.slice(0, shown).flatMap((w) => {
-    const s = trainingSource(w.labels);
-    return s.kind === "puzzles" ? [{ key: w.key, puzzleLabels: s.puzzleLabels }] : [];
+    const weakness = weaknessFromKey(w.key);
+    return weakness ? [weakness] : [];
   });
 }

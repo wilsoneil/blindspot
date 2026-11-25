@@ -6,7 +6,8 @@ import { describeKey } from "@/lib/analysis/profile";
 import { getAppContext } from "@/lib/app-data";
 import { clientPuzzle } from "@/lib/training/client-puzzle";
 import { puzzleLevel } from "@/lib/training/rating";
-import { selectPuzzles, trainingSource } from "@/lib/training/select";
+import { trainingSource } from "@/lib/training/select";
+import { selectFor, weaknessFromKey } from "@/lib/training/sources";
 import { describeProfileKey, profileKeyForSetting } from "@/lib/weakness-store";
 import { SetupNotice } from "../../setup-notice";
 import { Drill } from "./drill";
@@ -19,19 +20,18 @@ export default async function DrillPage({ searchParams }: PageProps<"/train/dril
   const params = await searchParams;
   const weaknessKey = typeof params.w === "string" ? params.w.slice(0, 300) : "";
   const profileKey = typeof params.tc === "string" ? params.tc.slice(0, 40) : profileKeyForSetting(ctx.settings.focusTimeControl);
-  const source = trainingSource(weaknessKey ? weaknessKey.split("+") : []);
+  const weakness = weaknessKey ? weaknessFromKey(weaknessKey) : null;
 
   const back = <p className="small" style={{ marginBottom: 0 }}><Link href="/">Back to your weaknesses</Link></p>;
-  if (source.kind !== "puzzles") {
+  if (!weakness) {
+    const source = trainingSource(weaknessKey ? weaknessKey.split("+") : []);
     return (
       <section className="card">
         <h1>Drill</h1>
         <p className="muted">
-          {source.kind === "ownGames"
-            ? "This weakness is trained with positions from your own games, which arrive in a later step."
-            : source.reason === "opening"
-              ? "Opening weaknesses become trainable once openings are matched to Lichess puzzles (a later step)."
-              : "Choose a weakness to drill from the home page."}
+          {source.kind === "notYet" && source.reason === "opening"
+            ? "Opening weaknesses become trainable once openings are matched to Lichess puzzles (a later step)."
+            : "Choose a weakness to drill from the home page."}
         </p>
         {back}
       </section>
@@ -39,13 +39,16 @@ export default async function DrillPage({ searchParams }: PageProps<"/train/dril
   }
 
   const level = await puzzleLevel(ctx.db, ctx.userId); // the Blindspot rating: hidden until Phase 4
-  const puzzles = await selectPuzzles(ctx.db, { userId: ctx.userId, puzzleLabels: source.puzzleLabels, count: 5, level });
+  const puzzles = await selectFor(ctx.db, weakness, { userId: ctx.userId, count: 5, level });
+  const own = weakness.kind === "ownGames";
   return (
     <section className="card">
       <h1>{describeKey(weaknessKey)} <span className="pill">Drill</span></h1>
       <p className="small muted">
-        Puzzles chosen for this weakness from your {describeProfileKey(profileKey)} games. Take your time:
-        wrong moves can be retried, but only a clean solve within the target time counts as solved.
+        {own
+          ? "Positions from your own games where you went wrong. Find the move you missed: any move close to the engine's best counts."
+          : `Puzzles chosen for this weakness from your ${describeProfileKey(profileKey)} games.`}{" "}
+        Take your time: wrong moves can be retried, but only a clean solve within the target time counts as solved.
       </p>
       {puzzles.length > 0 ? (
         <Drill
@@ -55,7 +58,11 @@ export default async function DrillPage({ searchParams }: PageProps<"/train/dril
           engineDefault={ctx.settings.engineOnBoard}
         />
       ) : (
-        <p className="muted">You&rsquo;ve attempted every puzzle for this weakness. Impressive.</p>
+        <p className="muted">
+          {own
+            ? "No positions ready for this weakness yet. They're worked out by the daily analysis job, or you've trained them all."
+            : "You've attempted every puzzle for this weakness. Impressive."}
+        </p>
       )}
       {back}
     </section>
