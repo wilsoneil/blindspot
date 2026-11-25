@@ -10,7 +10,7 @@ import type { Key } from "@lichess-org/chessground/types";
 import "@lichess-org/chessground/assets/chessground.base.css";
 import "@lichess-org/chessground/assets/chessground.cburnett.css";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import type { Square } from "chess.js";
+import { Chess, type Square } from "chess.js";
 import { FindMoveRun, PuzzleRun, type BoardRun, type Uci } from "@/lib/training/play";
 import "./board.css";
 
@@ -50,6 +50,7 @@ type Status =
 
 const SETUP_DELAY_MS = 600; // show the starting position briefly before the opponent's move
 const REPLY_DELAY_MS = 350;
+const REVEAL_PAUSE_MS = 800; // between moves when showing the solution
 const PROMOTION_PIECES = [
   { piece: "q", symbol: "♛", name: "Queen" },
   { piece: "r", symbol: "♜", name: "Rook" },
@@ -208,9 +209,20 @@ export function PuzzleBoard({ fen, moves, targetMs, onWrong = "retry", onFinish,
         finish(false, true);
         return;
       }
+      // One move at a time: the user's move, a pause, then the opponent's reply.
+      const afterMove = new Chess(r.fen);
+      afterMove.move({ from: move.slice(0, 2), to: move.slice(2, 4), promotion: move[4] });
       const outcome = r.play(move);
-      sync(outcome.result === "correct" ? outcome.reply : move);
-      setTimeout(step, REPLY_DELAY_MS * 2);
+      if (outcome.result === "correct") {
+        ground.current?.set({ fen: afterMove.fen(), lastMove: squares(move), check: afterMove.inCheck() });
+        setTimeout(() => {
+          sync(outcome.reply);
+          setTimeout(step, REVEAL_PAUSE_MS);
+        }, REVEAL_PAUSE_MS);
+      } else {
+        sync(move);
+        setTimeout(step, REVEAL_PAUSE_MS);
+      }
     };
     step();
   };
