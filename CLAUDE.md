@@ -7,13 +7,13 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 - Phase 1A (hello-world page deployed from GitHub to Vercel): done
 - Phase 1 (Foundations, including login): done. Sign-in live; games imported (daily import scheduled); puzzle store built (155,285 puzzles, every label covered; labels reviewed against the full Lichess database)
 - Phase 2 (Analysis): done. Migration 0004 applied; 12-month backlog analysed (684 blitz games, 2,560 mistakes); the first real profile looks sensible (a mix of single labels and endgame pairs). Daily analysis runs after the import
-- Phase 3 (Training): in progress. Decisions in SPEC.md (target time, repetition schedule, accepted moves; Blindspot rating calculated from Phase 3, shown in Phase 4). Steps 1–2 done; migration 0005 applied
+- Phase 3 (Training): in progress. Decisions in SPEC.md (target time, repetition schedule, accepted moves; Blindspot rating calculated from Phase 3, shown in Phase 4). Steps 1–3 done; migration 0005 applied
 
 ### Phase 3 plan (one pull request per step)
 
 1. Attempts tables (migration 0005) and a puzzle build that keeps attempted puzzles: **done**
 2. Puzzle selection for a weakness (label or pair), near the user's level, skipping seen ones: **done** (`src/lib/training/select.ts`; level is a fixed 1500 until step 6)
-3. Puzzle board (chessground): move checking, alternative mates, promotion, timer
+3. Puzzle board (chessground): move checking, alternative mates, promotion, timer: **done** (`src/lib/training/play.ts`, `src/app/train/puzzle-board.tsx`; try it at `/train/preview`, which step 4 replaces)
 4. Drill mode and attempt logging (first-attempt rule)
 5. Analysis board, optional in-browser Stockfish
 6. Glicko-2 Blindspot rating, stored but hidden; adaptive difficulty
