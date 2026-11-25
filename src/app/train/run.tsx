@@ -1,8 +1,8 @@
 "use client";
 
 // A Rush or Survival run (SPEC.md -> "Training modes"). Puzzles come one after another;
-// a wrong move ends the puzzle. Rush ends when the clock runs out, Survival when the
-// lives are used up. Every finished puzzle is saved as an attempt.
+// a wrong move ends the puzzle and costs a life. Both end when the lives are used up, and
+// Rush also when the clock runs out. Every finished puzzle is saved as an attempt.
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -18,12 +18,14 @@ interface Props {
   initial: ClientPuzzle[];
   rushMs: number;
   lives: number;
+  /** What the mode is, shown only before the run starts. */
+  intro: string;
 }
 
 type Done = { puzzle: ClientPuzzle; correct: boolean };
 const NEXT_DELAY_MS = 600;
 
-export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives }: Props) {
+export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives, intro }: Props) {
   const [phase, setPhase] = useState<"ready" | "playing" | "over">("ready");
   const [queue, setQueue] = useState(initial);
   const [index, setIndex] = useState(0);
@@ -90,7 +92,7 @@ export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives }: 
     });
     setDone((d) => [...d, { puzzle: p, correct: r.correct }]);
     let over = false;
-    if (!r.correct && mode === "survival") {
+    if (!r.correct) {
       const left = livesLeft - 1;
       setLivesLeft(left);
       if (left <= 0) {
@@ -106,12 +108,15 @@ export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives }: 
 
   if (phase === "ready") {
     return (
-      <div className="save-bar" style={{ margin: "0.5rem 0 1rem" }}>
-        <button type="button" className="button" onClick={start} disabled={!puzzle}>
-          {mode === "rush" ? `Start the ${Math.round(rushMs / 60_000)}-minute rush` : "Start"}
-        </button>
-        {!puzzle && <span className="small muted">No unseen puzzles for your weaknesses right now.</span>}
-      </div>
+      <>
+        <p className="small muted">{intro}</p>
+        <div className="save-bar" style={{ margin: "0.5rem 0 1rem" }}>
+          <button type="button" className="button" onClick={start} disabled={!puzzle}>
+            {mode === "rush" ? `Start the ${Math.round(rushMs / 60_000)}-minute rush` : "Start"}
+          </button>
+          {!puzzle && <span className="small muted">No unseen puzzles for your weaknesses right now.</span>}
+        </div>
+      </>
     );
   }
 
@@ -153,12 +158,14 @@ export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives }: 
     <>
       <div className="run-head">
         <span><strong>{score}</strong> <span className="muted">solved</span></span>
-        {mode === "rush" ? (
+        {puzzle?.review && <span className="pill" title="A puzzle you missed before, back for review">Review</span>}
+        <span aria-label={`${livesLeft} ${livesLeft === 1 ? "life" : "lives"} left`} className="run-lives">
+          {"♥".repeat(livesLeft)}<span className="muted">{"♡".repeat(Math.max(0, lives - livesLeft))}</span>
+        </span>
+        {mode === "rush" && (
           <span className={`run-clock${left < 30_000 ? " over" : ""}`}>
             {Math.floor(left / 60_000)}:{String(Math.floor((left % 60_000) / 1000)).padStart(2, "0")}
           </span>
-        ) : (
-          <span aria-label={`${livesLeft} lives left`}>{"♥".repeat(livesLeft)}<span className="muted">{"♡".repeat(lives - livesLeft)}</span></span>
         )}
       </div>
       {puzzle ? (

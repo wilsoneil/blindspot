@@ -12,13 +12,16 @@ body {
   padding: 0;
 }
 
+/* Everything is sized in rem, so this one number scales text and spacing together. */
+html { font-size: 15px; }
+
 body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 1rem;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -33,8 +36,8 @@ h3 {
   margin: 0 0 0.5rem;
 }
 
-h1 { font-size: 1.6rem; }
-h2 { font-size: 1.15rem; }
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.1rem; }
 h3 { font-size: 1rem; }
 
 p { margin: 0 0 0.75rem; }
@@ -276,7 +279,7 @@ ol.weaknesses {
   margin: 0 0 0.75rem;
 }
 
-.weakness { padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+.weakness { padding: 0.45rem 0; border-bottom: 1px solid var(--border); }
 .weakness:last-child { border-bottom: none; }
 
 .weakness-head {
@@ -321,3 +324,23 @@ ol.weaknesses {
   margin: 0.25rem 0 0.75rem;
 }
 .modes .button { text-decoration: none; }
+.modes > span { flex-basis: 100%; }
+
+/* Shown at once while the next page loads (src/app/loading.tsx). */
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 4rem 0;
+}
+.spinner {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
+
+.weakness-training { color: var(--accent); }

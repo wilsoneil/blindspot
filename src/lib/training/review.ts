@@ -1,5 +1,5 @@
 // The spaced-repetition queue (SPEC.md -> "Training modes"): failed or slow puzzles come back
-// in Blindspot sessions after 1, 3, 7, then 21 days.
+// in Rush and Survival runs after 1, 3, 7, then 21 days.
 //
 //   - A failure or slow solve (any mode) puts the puzzle on the queue, due in 1 day.
 //   - A clean solve of a puzzle that is due moves it to the next step; after the 21-day step

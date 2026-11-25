@@ -4,6 +4,7 @@ import { ANALYSIS_VERSION } from "@/lib/analysis/eval";
 import { getAppContext } from "@/lib/app-data";
 import type { Db } from "@/lib/db";
 import { describeTimeControl, type Settings } from "@/lib/settings";
+import { recentDrills } from "@/lib/training/stats";
 import {
   ANALYSED_TIME_CLASSES, describeProfileKey, historyStart, loadProfiles, profileKeyForSetting,
 } from "@/lib/weakness-store";
@@ -43,10 +44,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   if (ctx.status !== "ready") return <SetupNotice ctx={ctx} />;
 
   const { settings } = ctx;
-  const [s, profiles, params] = await Promise.all([
+  const [s, profiles, params, drills] = await Promise.all([
     loadStatus(ctx.db, ctx.userId, settings),
     loadProfiles(ctx.db, ctx.userId),
     searchParams,
+    recentDrills(ctx.db, ctx.userId),
   ]);
   profiles.sort((a, b) => b.gamesAnalysed - a.gamesAnalysed);
 
@@ -82,7 +84,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           </nav>
         )}
         {profile && profile.top.length > 0 ? (
-          <WeaknessList profile={profile} shown={settings.weaknessesShown} />
+          <WeaknessList profile={profile} shown={settings.weaknessesShown} drills={drills} />
         ) : (
           <p className="muted" style={{ marginBottom: 0 }}>
             {s.analysed === 0
