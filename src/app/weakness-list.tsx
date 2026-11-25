@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { describeKey } from "@/lib/analysis/profile";
-import { trainingSource } from "@/lib/training/select";
+import { weaknessFromKey } from "@/lib/training/sources";
 import type { StoredProfile } from "@/lib/weakness-store";
 
 export const formatDate = (iso: string) =>
@@ -18,7 +18,7 @@ export function WeaknessList({ profile, shown }: { profile: StoredProfile; shown
             <div className="weakness-head">
               {/* Named from the key, so a wording change shows without waiting for the next rebuild. */}
               <span className="weakness-name">{describeKey(w.key)}</span>
-              {trainingSource(w.labels).kind !== "notYet" && (
+              {weaknessFromKey(w.key) && (
                 <Link
                   className="drill-link"
                   href={`/train/drill?w=${encodeURIComponent(w.key)}&tc=${encodeURIComponent(profile.profileKey)}`}
@@ -38,7 +38,7 @@ export function WeaknessList({ profile, shown }: { profile: StoredProfile; shown
           </li>
         ))}
       </ol>
-      {top.some((w) => trainingSource(w.labels).kind !== "notYet") && (
+      {top.some((w) => weaknessFromKey(w.key)) && (
         <div className="modes">
           <span className="small muted">All your top weaknesses, mixed:</span>
           <Link className="button" href={`/train/blindspot?tc=${encodeURIComponent(profile.profileKey)}`}>Blindspot</Link>

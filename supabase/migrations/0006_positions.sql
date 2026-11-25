@@ -1,4 +1,5 @@
--- Blindspot: Phase 3, step 10 ("find the move" positions from the user's own games).
+-- Blindspot: Phase 3, steps 10 and 11 ("find the move" positions from the user's own games,
+-- and finding puzzles by opening).
 --
 -- How to apply: Supabase dashboard -> SQL Editor -> paste this file -> Run.
 -- Adds, for each stored mistake, the moves accepted as answers when the position is
@@ -11,3 +12,6 @@ alter table mistakes
   add column positions_version  int;     -- which version of the method (src/lib/analysis/accepted.ts)
 
 create index mistakes_positions_todo on mistakes (user_id) where accepted_moves is null;
+
+-- Step 11: opening weaknesses are trained with puzzles found by their Lichess OpeningTags.
+create index puzzles_opening_tags on puzzles using gin (opening_tags);
