@@ -1,0 +1,58 @@
+/* The puzzle board. Squares come from the theme (--board-light / --board-dark), so each
+   theme colours its own board; chessground's base stylesheet handles the layout. */
+
+.board {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  touch-action: none; /* dragging a piece mustn't scroll the page on a phone */
+}
+
+.board cg-board {
+  background-color: var(--board-light);
+  /* An 8x8 checkerboard: each tile is 2x2 squares with a light top-left, as a8 is. */
+  background-image: repeating-conic-gradient(var(--board-dark) 0 25%, var(--board-light) 0 50%);
+  background-size: 25% 25%;
+}
+
+.board cg-board square.last-move { background-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.board cg-board square.selected { background-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.board cg-board square.move-dest {
+  background: radial-gradient(color-mix(in srgb, var(--accent-text) 45%, transparent) 20%, transparent 0);
+}
+.board cg-board square.oc.move-dest {
+  background: radial-gradient(transparent 0%, transparent 78%, color-mix(in srgb, var(--accent-text) 40%, transparent) 78%);
+}
+.board cg-board square.move-dest:hover { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+.board cg-board square.check {
+  background: radial-gradient(ellipse at center, var(--bad) 0%, color-mix(in srgb, var(--bad) 70%, transparent) 30%, transparent 85%);
+}
+
+.puzzle-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0;
+}
+.puzzle-status .timer { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+.puzzle-status .over { color: var(--bad); }
+
+.promotion {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  align-items: center;
+}
+.promotion button {
+  font-size: 1.6rem;
+  line-height: 1;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text);
+  cursor: pointer;
+}
