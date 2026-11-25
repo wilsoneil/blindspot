@@ -62,8 +62,8 @@ export const LABELS: Label[] = [
   tactic("zugzwang", "Zugzwang", ["zugzwang"]),
 
   // Mates
-  mate("shortMate", "Short mates (in 1–2)", ["mateIn1", "mateIn2"]),
-  mate("longMate", "Longer mates (3+)", ["mateIn3", "mateIn4", "mateIn5"]),
+  mate("shortMate", "Short mates in 1–2", ["mateIn1", "mateIn2"]),
+  mate("longMate", "Mates in 3 or more", ["mateIn3", "mateIn4", "mateIn5"]),
   mate("backRankMate", "Back-rank mate", ["backRankMate"]),
   mate("smotheredMate", "Smothered mate", ["smotheredMate"]),
   mate("otherMatePattern", "Other mating patterns", [

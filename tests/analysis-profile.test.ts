@@ -128,3 +128,11 @@ describe("pairs", () => {
     expect(p.top.filter((e) => e.labels.length === 2).length).toBeLessThanOrEqual(2);
   });
 });
+
+describe("names", () => {
+  it("reads naturally, with one set of brackets", () => {
+    expect(describeKey("shortMate:missed")).toBe("Short mates in 1–2 (missed)");
+    expect(describeKey("longMate:allowed")).toBe("Mates in 3 or more (allowed)");
+    expect(describeKey("phaseEndgame+shortMate:missed")).toBe("Short mates in 1–2 (missed) in the endgame");
+  });
+});

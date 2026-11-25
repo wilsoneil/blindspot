@@ -6,7 +6,7 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 
 - Phase 1A (hello-world page deployed from GitHub to Vercel): done
 - Phase 1 (Foundations, including login): done. Sign-in live; games imported (daily import scheduled); puzzle store built (155,285 puzzles, every label covered; labels reviewed against the full Lichess database)
-- Phase 2 (Analysis): built and tested on made-up games (local database, real Stockfish and tagger). Waiting for migration 0004 and the first backlog run on real games; mark it done once the profile from real games looks sensible
+- Phase 2 (Analysis): done. Migration 0004 applied; 12-month backlog analysed (684 blitz games, 2,560 mistakes); the first real profile looks sensible (a mix of single labels and endgame pairs). Daily analysis runs after the import
 - Next: Phase 3 (Training)
 
 Update this section when a phase is finished.
@@ -17,7 +17,7 @@ Update this section when a phase is finished.
 - **Phase 3, puzzle scores in the blend:** `puzzleScores` in `src/lib/analysis/profile.ts` must use the game score's scale (1 = the user's average for that label family, higher = weaker).
 - **Phase 3, openings:** opening weaknesses are keyed by chess.com names (`src/lib/analysis/openings.ts`); training them needs a mapping to Lichess `OpeningTags`. Openings are not paired with other labels until then.
 - **Phase 3, positional pairs:** a pair with a positional label (e.g. pawn decisions in the transition) counts the user's own mistakes as its "puzzles", so it rarely reaches 200. Revisit the 200 rule for those once real numbers exist.
-- **With real data, review:** each label is scored against its own family. Families with many labels (tactics) can reach higher scores than small ones (phases, position states), so the top list may lean towards tactics. Check this against the first real profile.
+- **Keep an eye on:** each label is scored against its own family, so families with many labels (tactics) can reach higher scores than small ones (phases, position states). The first real profile was acceptable, but its top five were all tactics or mates (two paired with the endgame).
 - **After that:** consider a quarterly automatic puzzle rebuild (a `schedule` in `.github/workflows/build-puzzles.yml`, like the daily import), to pick up Lichess's monthly updates.
 
 ## How to work
