@@ -13,6 +13,11 @@ The engine's best line can run on long after the tactic is over, and the tagger 
 puzzle-length line, so it is first trimmed: a forced mate is kept to the mate; otherwise the
 line stops at the solver move that wins the most material (within 4 solver moves).
 
+A line that wins no material and doesn't mate isn't a tactic, so it gets no tags. (Without
+this, the tagger would see a one-move "puzzle" ending in a quiet move and call it a
+"defensive move": a catch-all for positional mistakes. Lichess never has such puzzles, as
+every Lichess puzzle wins something.)
+
 Run the built-in check:  python3 scripts/tagger/tag.py --tagger <dir> --self-test
 """
 
@@ -66,13 +71,14 @@ def legal_prefix(board, ucis):
 
 
 def trim(board, moves, pov):
+    """The puzzle-length part of the line, and whether it wins something (material or mate)."""
     b = board.copy()
     for i, move in enumerate(moves):
         b.push(move)
         if b.is_checkmate():
             if i % 2 == 1:  # the solver mates
-                return moves[: i + 1]
-            return moves[: max(i, 2)]
+                return moves[: i + 1], True
+            return moves[: max(i, 2)], False
     window = moves[: 2 * MAX_SOLVER_MOVES]
     b = board.copy()
     b.push(window[0])
@@ -88,7 +94,7 @@ def trim(board, moves, pov):
             best_gain, best_end = gain, j + 1
         if j + 1 < len(window):
             b.push(window[j + 1])
-    return window[:best_end]
+    return window[:best_end], best_gain > 0
 
 
 def tag(request):
@@ -97,7 +103,9 @@ def tag(request):
     if len(moves) < 2:
         return {"themes": [], "line": [m.uci() for m in moves]}
     pov = not board.turn  # the solver: the side NOT making the first move
-    moves = trim(board, moves, pov)
+    moves, wins = trim(board, moves, pov)
+    if not wins:
+        return {"themes": [], "line": [m.uci() for m in moves]}
     node = Game.from_board(board)
     for move in moves:
         node = node.add_main_variation(move)
@@ -115,13 +123,15 @@ def self_test():
         # Black moves the bishop away; White mates on the back rank.
         ({"fen": "6k1/5ppp/8/8/8/8/1b3PPP/R5K1 b - - 0 1", "moves": ["b2c3", "a1a8"], "cp": 10000}, "backRankMate"),
         ({"fen": "6k1/5ppp/8/8/8/8/1b3PPP/R5K1 b - - 0 1", "moves": ["b2c3", "a1a8"], "cp": 10000}, "mateIn1"),
+        # A quiet line that wins nothing (a positional mistake): no tags, not "defensiveMove".
+        ({"fen": "6k1/5ppp/8/8/8/8/5PPP/R5K1 b - - 0 1", "moves": ["g8f8", "g1f1", "f8e7", "f1e2"], "cp": 30}, None),
     ]
     ok = True
     for request, expected in cases:
         themes = tag(request)["themes"]
-        passed = expected in themes
+        passed = (expected in themes) if expected else themes == []
         ok = ok and passed
-        print(f"{'ok  ' if passed else 'FAIL'} expected {expected}: got {' '.join(themes)}")
+        print(f"{'ok  ' if passed else 'FAIL'} expected {expected or 'no tags'}: got {' '.join(themes) or 'no tags'}")
     return ok
 
 

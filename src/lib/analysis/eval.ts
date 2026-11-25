@@ -20,7 +20,9 @@ export const ENGINE = {
 } as const;
 
 /** Bump when the engine settings or the way mistakes are found and tagged changes. */
-export const ANALYSIS_VERSION = 1;
+// 2 (Nov 2026): a line that wins no material and doesn't mate gets no tactic tags
+//    (scripts/tagger/tag.py); before, positional mistakes were tagged "defensive move".
+export const ANALYSIS_VERSION = 2;
 
 /**
  * A move is a mistake when it lowers the player's chance of winning by at least 10
