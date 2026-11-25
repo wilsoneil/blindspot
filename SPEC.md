@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 25 Nov 2026 (Phase 2: analysis and scoring rules made precise)
+Last updated: 25 Nov 2026 (Phase 3 decisions: target time, repetition schedule, accepted moves, rating calculated from Phase 3)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -125,14 +125,15 @@ Four modes, all drawing only on puzzles matched to the weakness profile. Only Dr
 | Survival | All top weaknesses, shuffled | Open-ended, rising difficulty | Three mistakes (setting) ends the run |
 | Blindspot | All top weaknesses, shuffled, unlabelled, plus past failures and slow solves | Timed and logged, own pace | As Drill |
 
-- Failed or slow puzzles return in later Blindspot sessions on a spaced-repetition schedule.
-- **Positional weaknesses** (transition, pawn decisions, other computed labels with no Lichess theme) use "find the move" positions from the user's own games: open format, no multiple choice, and any move within a small margin of Stockfish's best is accepted. Drill serves them when that weakness is chosen; the mixed modes include them alongside Lichess puzzles, with difficulty approximated by how subtle the best move is. They count towards each run's score but never towards the Blindspot rating, and are tracked separately as accuracy and speed.
+- Failed or slow puzzles return in later Blindspot sessions on a spaced-repetition schedule: due again after 1, then 3, 7 and 21 days. A clean solve (correct within target time) moves a puzzle to the next step, and one after the 21-day step leaves the schedule; a failure or slow solve sends it back to 1 day.
+- **Positional weaknesses** (transition, pawn decisions, other computed labels with no Lichess theme) use "find the move" positions from the user's own games: open format, no multiple choice, and any move within a small margin of Stockfish's best is accepted. The accepted moves are worked out in advance by the analysis job (Stockfish's top few moves, kept if they lose little winning chance against the best), so the browser needs no engine to mark an answer. Drill serves them when that weakness is chosen; the mixed modes include them alongside Lichess puzzles, with difficulty approximated by how subtle the best move is: the fewer moves are accepted and the larger the gap to the next-best move, the harder the position. They count towards each run's score but never towards the Blindspot rating, and are tracked separately as accuracy and speed.
 
 ## Puzzle experience
 
 Every attempt logs the result and the time taken; both feed the weakness score and puzzle selection.
 
-- Each puzzle is timed; the log records correct or wrong, solve time, retries and whether the solution was revealed
+- Each puzzle is timed; the log records correct or wrong, solve time, retries and whether the solution was revealed, plus the puzzle's Lichess rating at the time (Lichess ratings drift between puzzle updates)
+- **Target time:** 15 seconds per move the user has to play, 50% longer for puzzles rated 200 or more above the user's Blindspot rating. The "stricter" setting multiplies it by 0.75, "looser" by 1.5
 - A puzzle only counts as fully solved if it is correct within its target time. Only the first attempt at any puzzle counts towards ratings; repeats train but don't score, so remembered answers can't inflate progress
 - Analysis board from any puzzle: step back through the moves and move pieces freely to explore alternative lines
 - Optional Stockfish in the browser on the analysis board: evaluation bar plus the top one or two moves, off by default so it never gives away a puzzle
@@ -158,7 +159,7 @@ One settings page holds every adjustable choice; defaults are what the spec desc
 | Games vs puzzles blend | 70 / 30 | 0–100% games |
 | Recency half-life | 60 days | 14–365 days |
 | Analysis history window | Last 12 months | 3 months to all games |
-| Target solve time | Set per puzzle difficulty | Stricter or looser |
+| Target solve time | 15 s per move to play, +50% for puzzles well above the user's level | Stricter (×0.75), normal or looser (×1.5) |
 | Rush length | 5 minutes | 3, 5 or 10 minutes |
 | Survival lives | 3 | 1–5 |
 | Engine on analysis board | Off | On / off |
@@ -209,8 +210,8 @@ Version 1 is phases 1–5; nothing is trainable until the analysis runs.
 
 1. **Foundations:** Next.js app replacing the hello-world page, Vercel deploy, Supabase database and schema (per-user from day one), login (Supabase Auth, allowlist), theme system, settings page skeleton, chess.com import, filtered puzzle store.
 2. **Analysis:** Stockfish job, mistake tagging, weakness profiles; run the 12-month backlog. Milestone: the user can see their weakness profile from real games.
-3. **Training:** puzzle board, the four modes, attempt logging, analysis board with optional engine, positional "find the move" drills.
-4. **Progress:** Blindspot rating, Blitz gap, theme ratings, charts. (The daily import schedule was switched on early, in Phase 1.)
+3. **Training:** puzzle board, the four modes, attempt logging, analysis board with optional engine, positional "find the move" drills. The Blindspot rating is calculated and stored from this phase, because rising difficulty and adaptive selection need it; it isn't shown until Phase 4.
+4. **Progress:** showing the Blindspot rating, Blitz gap, theme ratings, charts. (The daily import schedule was switched on early, in Phase 1.)
 5. **AI explanations:** an on-demand Explain button after a puzzle and on the analysis board. Stockfish and code establish the facts (the line, what is attacked, what the move fixes); the AI only puts them into words and never judges the position itself. Positional weaknesses first. Cost controls: prepaid provider credits with auto top-up off (hard cap); an in-app monthly budget and daily limit set in settings; a usage panel showing explanations and estimated spend this month; each position's explanation cached so repeats are free; a small, cheap model by default.
 
 **Later:** opening up to multiple users; mining unseen positional positions from Lichess games as a fairer test of positional training.

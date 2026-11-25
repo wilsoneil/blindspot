@@ -7,13 +7,28 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 - Phase 1A (hello-world page deployed from GitHub to Vercel): done
 - Phase 1 (Foundations, including login): done. Sign-in live; games imported (daily import scheduled); puzzle store built (155,285 puzzles, every label covered; labels reviewed against the full Lichess database)
 - Phase 2 (Analysis): done. Migration 0004 applied; 12-month backlog analysed (684 blitz games, 2,560 mistakes); the first real profile looks sensible (a mix of single labels and endgame pairs). Daily analysis runs after the import
-- Next: Phase 3 (Training)
+- Phase 3 (Training): in progress. Decisions in SPEC.md (target time, repetition schedule, accepted moves; Blindspot rating calculated from Phase 3, shown in Phase 4). Step 1 done in code; migration 0005 must be applied before the next puzzle build
+
+### Phase 3 plan (one pull request per step)
+
+1. Attempts tables (migration 0005) and a puzzle build that keeps attempted puzzles: **done**
+2. Puzzle selection for a weakness (label or pair), near the user's level, skipping seen ones
+3. Puzzle board (chessground): move checking, alternative mates, promotion, timer
+4. Drill mode and attempt logging (first-attempt rule)
+5. Analysis board, optional in-browser Stockfish
+6. Glicko-2 Blindspot rating, stored but hidden; adaptive difficulty
+7. Puzzle scores in the profile blend
+8. Rush and Survival
+9. Blindspot mode and the review queue
+10. Positional "find the move" drills (analysis job stores accepted moves and subtlety; backfill)
+11. Openings: chess.com names to Lichess `OpeningTags`
+12. Review: positional pairs' 200 rule, tactics dominance; mark Phase 3 done
 
 Update this section when a phase is finished.
 
 ### Notes for later phases
 
-- **Phase 3, before training goes live:** a real puzzle build removes stored puzzles it no longer selects (`src/lib/puzzle-store.ts`). Change it to keep any puzzle that has attempts, and store the puzzle's rating with each attempt (Lichess ratings drift between updates; the Blindspot rating must use the rating at the time of the attempt).
+- **Phase 3, ratings:** each attempt stores the puzzle's Lichess rating at the time (`puzzle_attempts.puzzle_rating`); the Blindspot rating must use that, not the current `puzzles.rating`.
 - **Phase 3, puzzle scores in the blend:** `puzzleScores` in `src/lib/analysis/profile.ts` must use the game score's scale (1 = the user's average for that label family, higher = weaker).
 - **Phase 3, openings:** opening weaknesses are keyed by chess.com names (`src/lib/analysis/openings.ts`); training them needs a mapping to Lichess `OpeningTags`. Openings are not paired with other labels until then.
 - **Phase 3, positional pairs:** a pair with a positional label (e.g. pawn decisions in the transition) counts the user's own mistakes as its "puzzles", so it rarely reaches 200. Revisit the 200 rule for those once real numbers exist.
