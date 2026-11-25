@@ -174,6 +174,7 @@ export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives, in
     <>
       <div className="run-head">
         <span><strong>{score}</strong> <span className="muted">solved</span></span>
+        {puzzle?.position && <span className="pill own" title="A position from one of your own games">Your game</span>}
         {puzzle?.review && <span className="pill" title="A puzzle you missed before, back for review">Review</span>}
         <span aria-label={`${livesLeft} ${livesLeft === 1 ? "life" : "lives"} left`} className="run-lives">
           {"♥".repeat(livesLeft)}<span className="muted">{"♡".repeat(Math.max(0, lives - livesLeft))}</span>

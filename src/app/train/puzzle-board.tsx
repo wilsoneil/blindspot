@@ -9,7 +9,7 @@ import type { Api } from "@lichess-org/chessground/api";
 import type { Key } from "@lichess-org/chessground/types";
 import "@lichess-org/chessground/assets/chessground.base.css";
 import "@lichess-org/chessground/assets/chessground.cburnett.css";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Square } from "chess.js";
 import { FindMoveRun, PuzzleRun, type BoardRun, type Uci } from "@/lib/training/play";
 import "./board.css";
@@ -37,6 +37,8 @@ export interface PuzzleBoardProps {
   allowReveal?: boolean;
   /** A "find the move" position: `fen` is the position to move in, and any of these moves solves it. */
   accepted?: Uci[];
+  /** Shown at the start of the status line, e.g. a "Your game" tag. */
+  tag?: ReactNode;
 }
 
 type Status =
@@ -57,7 +59,7 @@ const PROMOTION_PIECES = [
 
 const squares = (uci: Uci): Key[] => [uci.slice(0, 2) as Key, uci.slice(2, 4) as Key];
 
-export function PuzzleBoard({ fen, moves, targetMs, onWrong = "retry", onFinish, allowReveal = false, accepted }: PuzzleBoardProps) {
+export function PuzzleBoard({ fen, moves, targetMs, onWrong = "retry", onFinish, allowReveal = false, accepted, tag }: PuzzleBoardProps) {
   const el = useRef<HTMLDivElement>(null);
   const ground = useRef<Api | null>(null);
   const run = useRef<BoardRun | null>(null);
@@ -257,8 +259,11 @@ export function PuzzleBoard({ fen, moves, targetMs, onWrong = "retry", onFinish,
         <button type="button" className="link-button" style={{ marginTop: "0.5rem" }} onClick={reveal}>Show solution</button>
       )}
       <p className="puzzle-status" aria-live="polite">
-        <span className={error || status.kind === "failed" || (status.kind === "playing" && status.note === "wrong") ? "message-error" : status.kind === "solved" ? "message-ok" : undefined}>
-          {message}
+        <span>
+          {tag}{tag ? " " : null}
+          <span className={error || status.kind === "failed" || (status.kind === "playing" && status.note === "wrong") ? "message-error" : status.kind === "solved" ? "message-ok" : undefined}>
+            {message}
+          </span>
         </span>
         <span className={`timer${shownMs > targetMs ? " over" : ""}`}>
           {(shownMs / 1000).toFixed(1)} s <span className="muted">/ {Math.round(targetMs / 1000)} s</span>
