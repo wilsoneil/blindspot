@@ -134,3 +134,53 @@ export const QUALIFYING_LABELS = new Set(
 
 /** Labels trained (also) with "find the move" positions from the user's own games. */
 export const OWN_GAME_LABELS = LABELS.filter((l) => l.fromOwnGames);
+
+// ---------------------------------------------------------------------------
+// Label keys used in the analysis (Phase 2)
+// ---------------------------------------------------------------------------
+//
+// A mistake carries label keys:
+//   - tactics and mates: "<id>:missed" or "<id>:allowed", e.g. "fork:missed"
+//   - computed labels: the plain id, e.g. "phaseTransition", "rookEndgame"
+//   - openings: "opening:..." keys (src/lib/analysis/openings.ts)
+
+export type TacticSide = "missed" | "allowed";
+
+const BY_ID = new Map(LABELS.map((l) => [l.id, l]));
+
+/** The tactic and mate label keys for a line the Lichess tagger has tagged. */
+export function tacticLabels(themes: string[], side: TacticSide): string[] {
+  return labelsForThemes(themes)
+    .filter((id) => BY_ID.get(id)?.missedAllowed)
+    .map((id) => `${id}:${side}`);
+}
+
+/** The label behind a key: "fork:missed" -> Fork. Openings have none. */
+export function labelForKey(key: string): Label | undefined {
+  return BY_ID.get(key.split(":")[0]);
+}
+
+/**
+ * The scoring family of a key. Each label is compared with the other labels of its family
+ * ("compared with the user's average"); missed and allowed are separate families.
+ */
+export function familyOfKey(key: string): string {
+  if (key.startsWith("opening:")) return "opening";
+  const label = labelForKey(key);
+  if (!label) return "unknown";
+  return label.missedAllowed ? `${label.family}:${key.split(":")[1]}` : label.family;
+}
+
+/** Display name: "fork:missed" -> "Fork (missed)". Openings are named in openings.ts. */
+export function describeLabelKey(key: string): string {
+  const label = labelForKey(key);
+  if (!label) return key;
+  const side = key.split(":")[1];
+  return side ? `${label.name} (${side})` : label.name;
+}
+
+/** Puzzle-store labels that train a key, or null if Lichess puzzles can't train it. */
+export function puzzleLabelForKey(key: string): string | null {
+  const label = labelForKey(key);
+  return label && label.lichessThemes.length > 0 ? label.id : null;
+}
