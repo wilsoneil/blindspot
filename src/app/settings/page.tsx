@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAppContext } from "@/lib/app-data";
 import { describeTimeControl } from "@/lib/settings";
@@ -32,6 +33,9 @@ export default async function SettingsPage() {
     <>
       <h1>Settings</h1>
       <SettingsForm settings={ctx.settings} timeControls={timeControls} />
+      <p className="small muted">
+        <Link href="/settings/profile-check">Profile check</Link>: how the weakness rules behave on your games.
+      </p>
     </>
   );
 }

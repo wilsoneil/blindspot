@@ -78,8 +78,8 @@ const toScored = (r: AttemptRow): PuzzleAttemptForScore => ({
   labels: r.labels, puzzleRating: r.puzzle_rating, fullySolved: r.correct && r.solve_ms <= r.target_ms, attemptedAt: r.attempted_at,
 });
 
-/** Rebuilds every profile for a user from the stored analysis and puzzle results. Returns the profile keys written. */
-export async function rebuildProfiles(db: Db, userId: string, settings: Settings, now = new Date()): Promise<string[]> {
+/** Everything a profile is built from: analysed games and mistakes per profile key, and puzzle results. */
+async function loadProfileInputs(db: Db, userId: string, settings: Settings, now: Date) {
   const start = historyStart(settings.historyMonths, now)?.toISOString() ?? "1970-01-01T00:00:00Z";
 
   const games = await readAll<GameRow>((from, to) =>
@@ -131,12 +131,20 @@ export async function rebuildProfiles(db: Db, userId: string, settings: Settings
     return puzzleCounts.get(k)!;
   };
 
+  const build = (data: { games: ProfileGame[]; mistakes: ProfileMistake[] }, review = false) =>
+    buildProfile(data.games, data.mistakes, {
+      halfLifeDays: settings.halfLifeDays, gamesWeightPct: settings.gamesWeightPct, now, countPuzzles,
+      puzzleScores: fromPuzzles, review,
+    });
+  return { byKey, build };
+}
+
+/** Rebuilds every profile for a user from the stored analysis and puzzle results. Returns the profile keys written. */
+export async function rebuildProfiles(db: Db, userId: string, settings: Settings, now = new Date()): Promise<string[]> {
+  const { byKey, build } = await loadProfileInputs(db, userId, settings, now);
   const written: string[] = [];
   for (const [key, data] of byKey) {
-    const profile = await buildProfile(data.games, data.mistakes, {
-      halfLifeDays: settings.halfLifeDays, gamesWeightPct: settings.gamesWeightPct, now, countPuzzles,
-      puzzleScores: fromPuzzles,
-    });
+    const profile = await build(data);
     await saveProfile(db, userId, key, profile, now);
     written.push(key);
   }
@@ -150,6 +158,18 @@ export async function rebuildProfiles(db: Db, userId: string, settings: Settings
     if (delErr) throw new Error(delErr.message);
   }
   return written;
+}
+
+/**
+ * One profile built fresh with its review (why each pair was or wasn't used, how each family
+ * fares), for the profile check page. Read-only: nothing is saved. Null if it has no games.
+ */
+export async function reviewProfile(
+  db: Db, userId: string, settings: Settings, profileKey: string, now = new Date(),
+): Promise<Profile | null> {
+  const { byKey, build } = await loadProfileInputs(db, userId, settings, now);
+  const data = byKey.get(profileKey);
+  return data ? build(data, true) : null;
 }
 
 async function saveProfile(db: Db, userId: string, key: string, p: Profile, now: Date) {

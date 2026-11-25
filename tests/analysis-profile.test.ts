@@ -143,6 +143,53 @@ describe("pairs", () => {
   });
 });
 
+describe("review (profile check page)", () => {
+  const g = games(40, ["phaseEndgame"]);
+  const m = [
+    ...Array.from({ length: 10 }, (_, i) => mistake(i + 1, ["fork:allowed"], 0.4, "phaseEndgame")),
+    ...Array.from({ length: 4 }, (_, i) => mistake(i + 11, ["fork:allowed"], 0.4, "phaseMiddlegame")),
+    ...Array.from({ length: 30 }, (_, i) => mistake(i + 1, ["pin:allowed"], 0.3, "phaseMiddlegame")),
+  ];
+
+  it("is only built when asked for, and changes nothing", async () => {
+    const plain = await buildProfile(g, m, opts);
+    const reviewed = await buildProfile(g, m, { ...opts, review: true });
+    expect(plain.review).toBeUndefined();
+    expect(reviewed.top).toEqual(plain.top);
+    expect(reviewed.all).toEqual(plain.all);
+  });
+
+  it("says why each pair was or wasn't used", async () => {
+    const shown = (await buildProfile(g, m, { ...opts, review: true })).review!;
+    expect(shown.pairs.find((x) => x.key === "fork:allowed+phaseEndgame"))
+      .toMatchObject({ outcome: "shown", positional: false, positions: 1000, games: 10 });
+    const few = (await buildProfile(g, m, { ...opts, review: true, countPuzzles: async () => 150 })).review!;
+    expect(few.pairs.find((x) => x.key === "fork:allowed+phaseEndgame")).toMatchObject({ outcome: "fewPositions" });
+    expect(shown.pairs.map((x) => x.score)).toEqual([...shown.pairs.map((x) => x.score)].sort((x, y) => y - x));
+  });
+
+  it("counts own mistakes as the positions of a positional pair", async () => {
+    const g2 = games(40, ["phaseEndgame"]);
+    const m2 = [
+      ...Array.from({ length: 10 }, (_, i) => mistake(i + 1, ["pawnDecisions"], 0.4, "phaseEndgame")),
+      ...Array.from({ length: 30 }, (_, i) => mistake(i + 1, ["pin:allowed"], 0.3, "phaseMiddlegame")),
+    ];
+    const r = (await buildProfile(g2, m2, { ...opts, review: true })).review!;
+    const pair = r.pairs.find((x) => x.key === "pawnDecisions+phaseEndgame")!;
+    expect(pair).toMatchObject({ positional: true, positions: 10 });
+    expect(["fewPositions", "parentNotInTop", "notClearlyWorse"]).toContain(pair.outcome);
+  });
+
+  it("sums up each family, with pairs counted for their broader label", async () => {
+    const p = await buildProfile(g, m, { ...opts, review: true });
+    const fam = new Map(p.review!.families.map((f) => [f.family, f]));
+    expect(fam.get("tactic:allowed")).toMatchObject({ eligible: 2 });
+    expect(fam.get("tactic:allowed")!.labels).toBeGreaterThan(10);
+    const inTop8 = p.review!.families.reduce((n, f) => n + f.inTop8, 0);
+    expect(inTop8).toBe(p.top.length);
+  });
+});
+
 describe("names", () => {
   it("reads naturally, with one set of brackets", () => {
     expect(describeKey("shortMate:missed")).toBe("Short mates in 1–2 (missed)");
