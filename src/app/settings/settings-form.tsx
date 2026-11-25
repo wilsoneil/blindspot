@@ -45,7 +45,7 @@ export function SettingsForm({ settings: s, timeControls }: { settings: Settings
       </fieldset>
 
       <fieldset>
-        <legend>Weakness profile <Coming phase={2} /></legend>
+        <legend>Weakness profile</legend>
         <div className="field">
           <label htmlFor="weaknessesShown">Number of weaknesses shown</label>
           <input id="weaknessesShown" name="weaknessesShown" type="number" min={3} max={8} defaultValue={s.weaknessesShown} />
@@ -55,6 +55,7 @@ export function SettingsForm({ settings: s, timeControls }: { settings: Settings
           <label htmlFor="gamesWeightPct">Games vs puzzles blend: {blend}% games / {100 - blend}% puzzles</label>
           <input id="gamesWeightPct" name="gamesWeightPct" type="range" min={0} max={100} step={5}
             value={blend} onChange={(e) => setBlend(Number(e.target.value))} />
+          <div className="hint">Puzzle results count from Phase 3; until then the profile uses games only.</div>
         </div>
         <div className="field">
           <label htmlFor="halfLifeDays">Recency half-life (days)</label>

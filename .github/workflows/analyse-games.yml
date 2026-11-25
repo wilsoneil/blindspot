@@ -1,0 +1,81 @@
+# Analyses imported games with Stockfish, tags the mistakes and rebuilds the weakness profiles.
+# Runs by itself after each daily "Import games" run, and can also be started by hand:
+# Actions tab -> "Analyse games" -> "Run workflow" (choose how many minutes it may run).
+#
+# The first run has the 12-month backlog to get through: start it by hand with a few hundred
+# minutes, as often as needed. Each run carries on where the last one stopped.
+name: Analyse games
+
+on:
+  workflow_run:
+    workflows: ["Import games"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "Stop starting new games after this many minutes (at most 330)"
+        default: "300"
+
+permissions:
+  contents: read
+
+# Never two runs at once: they would analyse the same games.
+concurrency:
+  group: analyse-games
+  cancel-in-progress: false
+
+env:
+  # Pinned, so a change in a score reflects the user's play, not the tools (SPEC.md).
+  STOCKFISH_RELEASE: sf_17.1
+  STOCKFISH_SHA256: 7fecbc0b26454b62be5e3b237b58dc5666401b56e520aeb1b0bf8f53fa8f2ef3
+  TAGGER_COMMIT: 8e24b6d5e2b9618e41581a327926e4ac67c610a2
+
+jobs:
+  analyse:
+    # After an import, only if the import worked.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # Downloaded to the runner's temporary folder: never part of the repo.
+      - name: Download Stockfish (pinned)
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/stockfish.tar" \
+            "https://github.com/official-stockfish/Stockfish/releases/download/$STOCKFISH_RELEASE/stockfish-ubuntu-x86-64-avx2.tar"
+          tar -xf "$RUNNER_TEMP/stockfish.tar" -C "$RUNNER_TEMP"
+          SF="$RUNNER_TEMP/stockfish/stockfish-ubuntu-x86-64-avx2"
+          echo "$STOCKFISH_SHA256  $SF" | sha256sum -c -
+          echo "STOCKFISH_PATH=$SF" >> "$GITHUB_ENV"
+
+      # The Lichess puzzle tagger (AGPL-3.0), run as a separate program; not copied into this repo.
+      - name: Download the Lichess puzzle tagger (pinned)
+        run: |
+          git clone --quiet https://github.com/ornicar/lichess-puzzler "$RUNNER_TEMP/lichess-puzzler"
+          git -C "$RUNNER_TEMP/lichess-puzzler" checkout --quiet "$TAGGER_COMMIT"
+          echo "LICHESS_TAGGER_DIR=$RUNNER_TEMP/lichess-puzzler/tagger" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install chess==1.3.0 # the version the tagger is written for
+
+      # Stops here if the engine or tagger doesn't behave as expected.
+      - name: Check the engine and tagger
+        run: |
+          python -I scripts/tagger/tag.py --tagger "$LICHESS_TAGGER_DIR" --self-test
+          npx vitest run tests/analysis.integration.test.ts
+        env:
+          PYTHON: python
+
+      - name: Analyse
+        run: npm run analyse:games -- --minutes "${{ inputs.minutes || '40' }}"
+        env:
+          PYTHON: python
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

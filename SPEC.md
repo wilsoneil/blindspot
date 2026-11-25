@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 24 Nov 2026 (labels reviewed against the Lichess database)
+Last updated: 25 Nov 2026 (Phase 2: analysis and scoring rules made precise)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -41,8 +41,22 @@ A scheduled job pulls new games daily, runs Stockfish over them and turns the mi
 4. **Profile:** update the weakness scores for that time control.
 
 - Initial backlog: last 12 months of blitz, plus daily games for the secondary profile
-- Schedule: daily (GitHub Actions), processing only new games
+- Schedule: daily (GitHub Actions), straight after the import, processing only new games. Each run has a time limit and carries on where the last one stopped, so the backlog is worked through in a few longer runs started by hand
 - No time-trouble category: puzzle speed covers that
+
+**Analysis rules (Phase 2):**
+
+- **Engine:** Stockfish 17.1, one thread, 300,000 nodes per position (about depth 20). One thread and a fixed node count give the same result every time. The engine and tagger versions are pinned in the workflow; changing them, or any rule below, means re-analysing every game.
+- **Mistake:** a move that lowers the user's chance of winning by at least 10 percentage points, using Lichess's winning-chance curve (Lichess's "mistake" level; smaller inaccuracies are ignored). The drop is the mistake's cost.
+- **Allowed:** for every mistake, the opponent's best reply line is tagged as a puzzle; its tactics are "allowed".
+- **Missed:** the user's best line is tagged only when there was a real chance: the opponent's previous move handed over at least 10 points of winning chance, or there was a forced mate. Its tactics are "missed".
+- **Tagger:** lines are trimmed to puzzle length before tagging (a forced mate is kept to the mate; otherwise the line ends at the user's move that wins the most material, within four moves).
+- **Phase:** endgame when at most six queens, rooks, bishops and knights are left in total. Otherwise the opening lasts until the user's development is done (at most one knight or bishop still at home, and the king off its starting square), but at least until move 10 and at most until move 15; the transition runs from then to move 20; then the middlegame.
+- **Endgame type:** the Lichess definitions (only kings, pawns and one kind of piece; or queen and rook).
+- **Position state:** from the evaluation before the move: 1.5 pawns or more up is converting, 1.5 or more down is defending, otherwise balanced.
+- **Move type:** pawn decisions = the move played or the best move is a pawn move; recapture choice = the opponent has just captured and the move played or the best move takes back on that square; trade decisions = the move played or the best move swaps a piece for one of equal value.
+- **Situations:** for each label, a game counts as exposed if the situation arose at any of the user's moves (the phase or endgame type was reached, the position state occurred, that kind of decision was on offer). Tactics and mates count as exposed in every game.
+- **Profiles:** one per time control; all daily games share one profile.
 
 ## Weakness profile
 
@@ -77,9 +91,10 @@ Categories come from a fixed list; every one maps to a Lichess puzzle filter (or
 
 **Openings by colour:**
 
-- **White:** narrow repertoire, so plenty of games per opening; scored down to variation level
-- **Black:** grouped by the user's own response (e.g. "my defence to 1.e4", "my setup against 1.d4"), not the opponent's opening, to pool small samples
-- **Rare openings** (a handful of games each) roll into one "Offbeat openings" bucket, which can itself surface as a weakness
+- **White:** narrow repertoire, so plenty of games per opening; scored down to variation level (chess.com's opening name without its trailing moves)
+- **Black:** grouped by the user's own response (e.g. "my defence to 1.e4", "my setup against 1.d4"), not the opponent's opening, to pool small samples. v1 groups by White's first move and the user's reply to it (e.g. "Your reply to 1.e4: 1...c5")
+- **Rare openings** (a handful of games each) roll into one "Offbeat openings" bucket, which can itself surface as a weakness. An opening needs five games in the profile to stand on its own; rarer ones roll up first to the family (White's opening family, or all replies to that first move as Black), then into the bucket
+- Only mistakes in the opening and transition phases count towards the game's opening
 
 ### Scoring method
 
@@ -88,12 +103,16 @@ Each category gets a score per time control:
 1. **Count** every mistake in the category.
 2. **Weight by cost:** the drop in winning chance, not raw engine points, so throwing away a won game counts heavily and +9 to +6 barely counts.
 3. **Weight by recency:** exponential decay with a 60-day half-life (setting).
-4. **Normalise by exposure:** mistakes per game in which the situation arises, compared with the user's average.
-5. **Require evidence:** small samples are pulled towards the average, and a category seen in fewer than three distinct games cannot enter the top list.
+4. **Normalise by exposure:** mistakes per game in which the situation arises, compared with the user's average. The average is taken within each family of labels (missed tactics, allowed tactics, missed mates, allowed mates, phases, endgame types, openings, move types, position states), so a category scores 1 when it costs as much as is usual for its family and 2 when it costs twice as much.
+5. **Require evidence:** small samples are pulled towards the average (as if every category had ten extra average games), and a category seen in fewer than three distinct games cannot enter the top list.
 
-The game score is blended with puzzle performance on the matching theme (solved within target time, against expectation for the puzzle rating), defaulting to 70% games and 30% puzzles (setting). Blended scores are then scaled 0–100 against each other, so the top list shows the weakest areas relative to the rest of the user's game.
+The game score is blended with puzzle performance on the matching theme (solved within target time, against expectation for the puzzle rating), defaulting to 70% games and 30% puzzles (setting). Until Phase 3 there are no puzzle results, so the game score is used alone; the puzzle score must use the same scale (1 = the user's average for that family). Blended scores are then scaled 0–100 against each other (the worst area shown is 100, the best 0), so the top list shows the weakest areas relative to the rest of the user's game.
 
 **Combinations:** categories are also scored in pairs, never triples (e.g. "pawn decisions in the transition"). A pair only replaces its broader label when it has at least 8 distinct games of evidence, is clearly worse than the broader label on its own, and has at least 200 matching puzzles. At most two of the top five can be pairs; otherwise the broader label is shown.
+
+- **Clearly worse:** the pair's share of the user's mistake cost is at least 1.25 times what its two labels would give if unrelated (pulled towards 1 for small samples). Its score is then the broader label's score times that factor, and it takes the place of whichever of its two labels scores higher.
+- **Matching puzzles:** Lichess puzzles carrying both labels. When either label is positional (no Lichess theme), the user's own mistakes with both labels are counted instead, since those are the "find the move" positions that would train it.
+- Two labels from the same family, phase with endgame type, and openings are not paired in v1 (matching openings to Lichess puzzles comes with training in Phase 3).
 
 ## Training modes
 
@@ -189,7 +208,7 @@ Version 1 is phases 1–5; nothing is trainable until the analysis runs.
 **Phase 1A (warm-up, done):** a "hello world" page deployed from GitHub to Vercel
 
 1. **Foundations:** Next.js app replacing the hello-world page, Vercel deploy, Supabase database and schema (per-user from day one), login (Supabase Auth, allowlist), theme system, settings page skeleton, chess.com import, filtered puzzle store.
-2. **Analysis:** Stockfish job, mistake tagging, weakness profiles; run the 12-month backlog. Milestone: the user can see his weakness profile from real games.
+2. **Analysis:** Stockfish job, mistake tagging, weakness profiles; run the 12-month backlog. Milestone: the user can see their weakness profile from real games.
 3. **Training:** puzzle board, the four modes, attempt logging, analysis board with optional engine, positional "find the move" drills.
 4. **Progress:** Blindspot rating, Blitz gap, theme ratings, charts. (The daily import schedule was switched on early, in Phase 1.)
 5. **AI explanations:** an on-demand Explain button after a puzzle and on the analysis board. Stockfish and code establish the facts (the line, what is attacked, what the move fixes); the AI only puts them into words and never judges the position itself. Positional weaknesses first. Cost controls: prepaid provider credits with auto top-up off (hard cap); an in-app monthly budget and daily limit set in settings; a usage panel showing explanations and estimated spend this month; each position's explanation cached so repeats are free; a small, cheap model by default.

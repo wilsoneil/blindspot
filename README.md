@@ -8,10 +8,11 @@ Finds the gaps in your chess from your own chess.com games and trains only those
 | --- | --- |
 | `src/app/` | The web pages (Next.js): home and settings |
 | `src/lib/` | The logic: settings, themes, weakness labels, chess.com import, puzzle filter, database connection |
-| `scripts/` | Command-line jobs: `import-games.ts` and `build-puzzles.ts` |
+| `src/lib/analysis/` | Game analysis: finding mistakes, labelling them, scoring the weakness profile |
+| `scripts/` | Command-line jobs: `import-games.ts`, `build-puzzles.ts` and `analyse-games.ts` (with the Stockfish and Lichess tagger helpers) |
 | `supabase/migrations/` | The database tables, as numbered SQL files |
 | `tests/` | Automated tests (made-up data only) |
-| `.github/workflows/` | Jobs GitHub runs: checks on pull requests, game import, puzzle build |
+| `.github/workflows/` | Jobs GitHub runs: checks on pull requests, game import, game analysis, puzzle build |
 
 ## One-time setup
 
@@ -61,7 +62,16 @@ While you're in Settings, open **Advanced Security** (or **Code security**) and 
 1. On the live site, open **Settings**, enter your chess.com username and save.
 2. In GitHub → **Actions** → **Import games** → **Run workflow**. It takes a few minutes; the log shows counts only. After that it runs by itself every morning.
 3. In GitHub → **Actions** → **Build puzzle store** → **Run workflow** with **dry run** ticked. Check the per-label counts in the log (none should say "none found"), then run it again with dry run unticked to save the puzzles.
-4. Refresh the home page: the Foundations panel shows your games, puzzles and ratings.
+4. Refresh the home page: the "Your data" panel shows your games, puzzles and ratings.
+
+### 6. Analyse your games (Phase 2)
+
+1. In the Supabase SQL Editor, run `supabase/migrations/0004_analysis.sql`.
+2. In GitHub → **Actions** → **Analyse games** → **Run workflow**. Leave the minutes at 300 the first time: it works through the 12-month backlog, newest games first, and saves each game as it goes. If the log ends with games "still to analyse", run it again; each run carries on where the last one stopped.
+3. Refresh the home page as soon as the first run finishes: the top weaknesses appear, and an "Analysis" bar shows how much of the backlog is left.
+4. After that it runs by itself straight after each morning's import (40 minutes at most), and only analyses new games.
+
+About cost: GitHub Actions is free for a public repository. For a private one, the free allowance is 2,000 minutes a month; the backlog takes roughly 5–15 hours of runs, depending on how many games you've played, and the daily runs a few minutes. The log shows the speed after every 25 games. If the allowance runs out, GitHub simply stops the jobs until the next month: no charge unless you've added a payment method and a spending limit above zero.
 
 ## Working on it locally (optional)
 
@@ -75,3 +85,5 @@ npm run lint       # code style checks
 ```
 
 To connect a local copy to the database, create a file called `.env.local` (Git ignores it) containing `SUPABASE_URL=...` and `SUPABASE_SERVICE_ROLE_KEY=...`. Then `npm run import:games` and `npm run build:puzzles -- --dry-run` also work locally.
+
+`npm run analyse:games -- --limit 5` also needs Stockfish 17.1, Python 3 with `pip install chess==1.3.0`, and a copy of the [Lichess puzzle tagger](https://github.com/ornicar/lichess-puzzler); set `STOCKFISH_PATH` and `LICHESS_TAGGER_DIR` (the `tagger` folder) in `.env.local`. With those two set, `npm test` also runs a check against the real engine.
