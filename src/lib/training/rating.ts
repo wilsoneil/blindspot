@@ -82,6 +82,13 @@ export function glicko2(player: Glicko, games: { rating: number; rd: number; sco
   return { rating: muNew * SCALE + 1500, rd: phiNew * SCALE, vol };
 }
 
+/** The chance of solving a puzzle at a given rating (the Glicko-2 expected score). */
+export function expectedScore(rating: number, puzzleRating: number): number {
+  const phi = PUZZLE_RD / SCALE;
+  const g = 1 / Math.sqrt(1 + (3 * phi * phi) / (Math.PI * Math.PI));
+  return 1 / (1 + Math.exp((-g * (rating - puzzleRating)) / SCALE));
+}
+
 export interface RatedAttempt {
   puzzleRating: number;
   /** Correct within target time. */
