@@ -5,7 +5,7 @@ import { loadDueReviews } from "../src/lib/training/run";
 import { FindMoveRun } from "../src/lib/training/play";
 import { selectPositions } from "../src/lib/training/positions";
 import { currentRating, START } from "../src/lib/training/rating";
-import { weaknessFromKey } from "../src/lib/training/sources";
+import { selectFor, weaknessFromKey } from "../src/lib/training/sources";
 import { fakeDb } from "./fake-db";
 
 // Made-up position: White to move, Nc7+ forks king and rook (the only good move).
@@ -117,5 +117,41 @@ describe("attempts at the user's own positions", () => {
     const tomorrow = new Date(Date.now() + 2 * 86_400_000);
     const got = await loadDueReviews(db, "u1", { limit: 4, level: 1500, now: tomorrow });
     expect(got.map((p) => [p.id, p.review])).toEqual([["m1", true]]);
+  });
+});
+
+describe("allowed weaknesses: own positions and Lichess puzzles, one of each in turn", () => {
+  const puzzle = (id: string) => ({
+    id, fen: "8/8/8/8/8/8/8/8 w - - 0 1", moves: "a2a3 a7a6", rating: 1500, themes: [], labels: ["fork", "defending"],
+  });
+  const own = (id: number) => mistake(id, { labels: ["fork:allowed", "defending", "phaseMiddlegame"] });
+
+  it("gets both, from the weakness's own labels", () => {
+    expect(weaknessFromKey("defending+fork:allowed")).toEqual({
+      key: "defending+fork:allowed", kind: "puzzles", puzzleLabels: ["defending", "fork"], ownLabelKeys: ["defending", "fork:allowed"],
+    });
+    expect(weaknessFromKey("fork:missed")).not.toHaveProperty("ownLabelKeys");
+  });
+
+  it("alternates own position, puzzle, own position, ...", async () => {
+    const { db } = fakeDb({
+      mistakes: [own(1), own(2), own(3), mistake(4, { labels: ["fork:missed", "defending"] })],
+      puzzles: Array.from({ length: 10 }, (_, i) => puzzle(`p${i}`)),
+      puzzle_attempts: [],
+    });
+    const got = await selectFor(db, weaknessFromKey("defending+fork:allowed")!, { userId: "u1", count: 5, level: 1500 });
+    expect(got.map((p) => (p.position ? "own" : "puzzle"))).toEqual(["own", "puzzle", "own", "puzzle", "own"]);
+    expect(got.filter((p) => p.position).map((p) => p.id).sort()).toEqual(["m1", "m2", "m3"]); // not m4: it was missed, not allowed
+  });
+
+  it("carries on with puzzles alone once the own positions are used up", async () => {
+    const { db } = fakeDb({
+      mistakes: [own(1)],
+      puzzles: Array.from({ length: 10 }, (_, i) => puzzle(`p${i}`)),
+      puzzle_attempts: [{ id: 1, user_id: "u1", mistake_id: 1, puzzle_id: null }],
+    });
+    const got = await selectFor(db, weaknessFromKey("defending+fork:allowed")!, { userId: "u1", count: 4, level: 1500 });
+    expect(got).toHaveLength(4);
+    expect(got.every((p) => !p.position)).toBe(true);
   });
 });
