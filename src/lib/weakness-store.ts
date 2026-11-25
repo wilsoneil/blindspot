@@ -2,6 +2,7 @@
 // Server-only: used by the daily analysis job and by the settings page.
 
 import { buildProfile, type Profile, type ProfileGame, type ProfileMistake } from "./analysis/profile";
+import { puzzleScores, type PuzzleAttemptForScore } from "./analysis/puzzle-scores";
 import type { Db } from "./db";
 import { describeTimeControl, type Settings } from "./settings";
 
@@ -64,7 +65,20 @@ interface MistakeRow {
   labels: string[];
 }
 
-/** Rebuilds every profile for a user from the stored analysis. Returns the profile keys written. */
+interface AttemptRow {
+  labels: string[];
+  puzzle_rating: number;
+  correct: boolean;
+  solve_ms: number;
+  target_ms: number;
+  attempted_at: string;
+}
+
+const toScored = (r: AttemptRow): PuzzleAttemptForScore => ({
+  labels: r.labels, puzzleRating: r.puzzle_rating, fullySolved: r.correct && r.solve_ms <= r.target_ms, attemptedAt: r.attempted_at,
+});
+
+/** Rebuilds every profile for a user from the stored analysis and puzzle results. Returns the profile keys written. */
 export async function rebuildProfiles(db: Db, userId: string, settings: Settings, now = new Date()): Promise<string[]> {
   const start = historyStart(settings.historyMonths, now)?.toISOString() ?? "1970-01-01T00:00:00Z";
 
@@ -98,6 +112,14 @@ export async function rebuildProfiles(db: Db, userId: string, settings: Settings
     });
   }
 
+  // Puzzle results (Phase 3): the same scores for every time control, since puzzles have none.
+  const attempts = await readAll<AttemptRow>((from, to) =>
+    db.from("puzzle_attempts")
+      .select("labels, puzzle_rating, correct, solve_ms, target_ms, attempted_at")
+      .eq("user_id", userId).eq("first_attempt", true).not("puzzle_id", "is", null)
+      .order("id").range(from, to));
+  const fromPuzzles = puzzleScores(attempts.map(toScored), { halfLifeDays: settings.halfLifeDays, now });
+
   const puzzleCounts = new Map<string, number>();
   const countPuzzles = async (labels: string[]) => {
     const k = [...labels].sort().join("+");
@@ -113,6 +135,7 @@ export async function rebuildProfiles(db: Db, userId: string, settings: Settings
   for (const [key, data] of byKey) {
     const profile = await buildProfile(data.games, data.mistakes, {
       halfLifeDays: settings.halfLifeDays, gamesWeightPct: settings.gamesWeightPct, now, countPuzzles,
+      puzzleScores: fromPuzzles,
     });
     await saveProfile(db, userId, key, profile, now);
     written.push(key);

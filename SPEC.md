@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 25 Nov 2026 (Phase 3: how the Blindspot rating is calculated)
+Last updated: 25 Nov 2026 (Phase 3: puzzle scores in the weakness blend)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -106,7 +106,7 @@ Each category gets a score per time control:
 4. **Normalise by exposure:** mistakes per game in which the situation arises, compared with the user's average. The average is taken within each family of labels (missed tactics, allowed tactics, missed mates, allowed mates, phases, endgame types, openings, move types, position states), so a category scores 1 when it costs as much as is usual for its family and 2 when it costs twice as much.
 5. **Require evidence:** small samples are pulled towards the average (as if every category had ten extra average games), and a category seen in fewer than three distinct games cannot enter the top list.
 
-The game score is blended with puzzle performance on the matching theme (solved within target time, against expectation for the puzzle rating), defaulting to 70% games and 30% puzzles (setting). Until Phase 3 there are no puzzle results, so the game score is used alone; the puzzle score must use the same scale (1 = the user's average for that family). Blended scores are then scaled 0–100 against each other (the worst area shown is 100, the best 0), so the top list shows the weakest areas relative to the rest of the user's game.
+The game score is blended with puzzle performance on the matching theme (solved within target time, against expectation for the puzzle rating), defaulting to 70% games and 30% puzzles (setting). The puzzle score uses the same scale (1 = the user's average for that family): for each first attempt at a Lichess puzzle, the Blindspot rating just before it predicts the chance of solving it; a label's misses (failed or slow) are compared with the misses its rating predicts, weighted by recency with the same half-life, divided by the same ratio for the label's whole family, and pulled towards 1 for small samples (as if three more expected misses at the family's ratio). A label needs five attempts before its puzzle score counts; until then, and for labels Lichess puzzles don't train, the game score is used alone. A tactic's puzzle score applies to both its missed and allowed sides. Scores are rebuilt by the daily job and after every ten puzzles in a session. Blended scores are then scaled 0–100 against each other (the worst area shown is 100, the best 0), so the top list shows the weakest areas relative to the rest of the user's game.
 
 **Combinations:** categories are also scored in pairs, never triples (e.g. "pawn decisions in the transition"). A pair only replaces its broader label when it has at least 8 distinct games of evidence, is clearly worse than the broader label on its own, and has at least 200 matching puzzles. At most two of the top five can be pairs; otherwise the broader label is shown.
 

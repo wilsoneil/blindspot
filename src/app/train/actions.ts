@@ -5,6 +5,7 @@
 // Server actions can be called directly by anyone who knows the site's address, so each
 // one checks the login itself rather than trusting that the page was shown.
 
+import { after } from "next/server";
 import { getSignedInUser } from "@/lib/auth";
 import { getDb, type Db } from "@/lib/db";
 import { settingsFromRow, type Settings, type SettingsRow } from "@/lib/settings";
@@ -13,6 +14,10 @@ import { clientPuzzle, type ClientPuzzle } from "@/lib/training/client-puzzle";
 import { puzzleLevel } from "@/lib/training/rating";
 import { selectPuzzles, trainingSource } from "@/lib/training/select";
 import { getUserIdForLogin } from "@/lib/user";
+import { rebuildProfiles } from "@/lib/weakness-store";
+
+/** Puzzle results feed the weakness scores: rebuild them every this many attempts in a session. */
+const REBUILD_EVERY = 10;
 
 type Signed = { db: Db; userId: string; settings: Settings };
 
@@ -35,6 +40,10 @@ export async function saveAttempt(input: AttemptInput): Promise<ActionResult<Att
     // The level before this attempt: the one the puzzle was served at.
     const level = await puzzleLevel(ctx.db, ctx.userId);
     const value = await recordPuzzleAttempt(ctx.db, ctx.userId, ctx.settings, input, level);
+    if (value.session.attempted % REBUILD_EVERY === 0) {
+      // After the response, so the next puzzle isn't held up. The daily job rebuilds too.
+      after(() => rebuildProfiles(ctx.db, ctx.userId, ctx.settings).catch((e) => console.error("Profile rebuild failed", e)));
+    }
     return { ok: true, value };
   } catch (e) {
     if (e instanceof AttemptError) return { ok: false, message: e.message };
