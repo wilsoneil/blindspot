@@ -19,7 +19,7 @@ describe("theme ratings", () => {
   it("show only the count until there are enough attempts", () => {
     const few = Array.from({ length: MIN_THEME_ATTEMPTS - 1 }, () => puzzle(["fork"], true));
     expect(themeRating("fork:allowed", few, NOW)).toEqual({ kind: "few", attempts: MIN_THEME_ATTEMPTS - 1 });
-    expect(themeRating("fork:allowed", [], NOW)).toBeNull();
+    expect(themeRating("fork:allowed", [], NOW)).toEqual({ kind: "few", attempts: 0 }); // shown as "Puzzles 0/10"
   });
 
   it("need both labels for a pair", () => {
@@ -39,6 +39,7 @@ describe("theme ratings", () => {
   it("give the share solved for a weakness trained with own positions", () => {
     const a = [own(["pawnDecisions", "phaseTransition"], true), own(["pawnDecisions", "phaseTransition"], false), own(["pawnDecisions"], true)];
     expect(themeRating("pawnDecisions+phaseTransition", a, NOW)).toEqual({ kind: "own", attempts: 2, solved: 1 });
+    expect(themeRating("converting+hangingPiece:missed", [], NOW)).toEqual({ kind: "own", attempts: 0, solved: 0 });
   });
 
   it("have nothing for openings", () => {

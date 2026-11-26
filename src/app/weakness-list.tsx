@@ -75,9 +75,9 @@ function RowStats({ theme, trend }: { theme?: ThemeRating; trend?: Trend }) {
         </span>
       )}
       {theme?.kind === "few" && <span>Puzzles {theme.attempts}/{MIN_THEME_ATTEMPTS}</span>}
-      {theme?.kind === "own" && (
-        <span>Positions <strong className="stat-num">{Math.round((100 * theme.solved) / theme.attempts)}%</strong></span>
-      )}
+      {theme?.kind === "own" && (theme.attempts > 0
+        ? <span>Positions <strong className="stat-num">{Math.round((100 * theme.solved) / theme.attempts)}%</strong></span>
+        : <span>Positions: none yet</span>)}
       {theme && trend && <span aria-hidden="true"> · </span>}
       {trend && (
         <span>

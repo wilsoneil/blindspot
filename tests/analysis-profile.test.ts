@@ -148,6 +148,13 @@ describe("pairs", () => {
     expect(fork.pairs.find((x) => x.key === "fork:allowed+phaseEndgame")).toMatchObject({ positional: false, outcome: "fewPositions" });
   });
 
+  it("are all kept for the history, shown or not", async () => {
+    const p = await buildProfile(g, m, { ...opts, countPuzzles: async () => 0 }); // too few puzzles to be shown
+    expect(p.top.some((e) => e.labels.length === 2)).toBe(false);
+    expect(p.pairs.find((e) => e.key === "fork:allowed+phaseEndgame")).toMatchObject({ games: 10, mistakes: 10 });
+    expect(p.pairs.every((e) => e.games >= 8 && e.perGame > 0)).toBe(true);
+  });
+
   it("need at least 8 distinct games", async () => {
     const few = m.filter((x) => !(x.phase === "phaseEndgame" && x.gameId > 7));
     const p = await buildProfile(g, few, opts);
