@@ -120,13 +120,16 @@ async function loadProfileInputs(db: Db, userId: string, settings: Settings, now
       .order("id").range(from, to));
   const fromPuzzles = puzzleScores(attempts.map(toScored), { halfLifeDays: settings.halfLifeDays, now });
 
-  const puzzleCounts = new Map<string, number>();
-  const countPuzzles = async (labels: string[]) => {
+  // Cached as promises, so the same count asked for twice at once is only read once.
+  const puzzleCounts = new Map<string, Promise<number>>();
+  const countPuzzles = (labels: string[]) => {
     const k = [...labels].sort().join("+");
     if (!puzzleCounts.has(k)) {
-      const { count, error } = await db.from("puzzles").select("id", { count: "exact", head: true }).contains("labels", labels);
-      if (error) throw new Error(`Could not count puzzles: ${error.message}`);
-      puzzleCounts.set(k, count ?? 0);
+      puzzleCounts.set(k, (async () => {
+        const { count, error } = await db.from("puzzles").select("id", { count: "exact", head: true }).contains("labels", labels);
+        if (error) throw new Error(`Could not count puzzles: ${error.message}`);
+        return count ?? 0;
+      })());
     }
     return puzzleCounts.get(k)!;
   };
