@@ -326,7 +326,6 @@ ol.weaknesses {
   margin: 0.25rem 0 0.75rem;
 }
 .modes .button { text-decoration: none; }
-.modes > span { margin-right: 0.25rem; }
 
 /* Shown at once while the next page loads (src/app/loading.tsx). */
 .loading {
@@ -385,3 +384,5 @@ ol.weaknesses {
 .how-to-read summary { cursor: pointer; color: var(--accent); }
 .how-to-read ul { margin: 0.4rem 0 0; padding-left: 1.1rem; }
 .how-to-read li { margin-bottom: 0.3rem; }
+.modes .how-to-read { margin: 0 0 0 0.25rem; }
+.modes .how-to-read[open] { flex-basis: 100%; margin-left: 0; }
