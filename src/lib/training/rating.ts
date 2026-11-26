@@ -125,6 +125,22 @@ export async function loadRatedAttempts(db: Pick<Db, "from">, userId: string): P
   }
 }
 
+/** The rating after each rated first attempt, with when it was played, oldest first (for the chart). */
+export async function ratingHistory(db: Pick<Db, "from">, userId: string): Promise<{ at: string; rating: Glicko }[]> {
+  const rows: { attempted_at: string; puzzle_rating: number; correct: boolean; solve_ms: number; target_ms: number }[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db.from("puzzle_attempts")
+      .select("attempted_at, puzzle_rating, correct, solve_ms, target_ms")
+      .eq("user_id", userId).eq("first_attempt", true).not("puzzle_id", "is", null)
+      .order("id").range(from, from + PAGE - 1);
+    if (error) throw new Error(`Could not read attempts for the rating: ${error.message}`);
+    rows.push(...(data as typeof rows));
+    if (data.length < PAGE) break;
+  }
+  const history = replay(rows.map((r) => ({ puzzleRating: r.puzzle_rating, fullySolved: r.correct && r.solve_ms <= r.target_ms })));
+  return history.map((rating, i) => ({ at: rows[i].attempted_at, rating }));
+}
+
 /** The user's current Blindspot rating. */
 export async function currentRating(db: Pick<Db, "from">, userId: string): Promise<Glicko> {
   const history = replay(await loadRatedAttempts(db, userId));

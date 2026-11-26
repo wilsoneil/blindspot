@@ -353,3 +353,27 @@ ol.weaknesses {
 .check-table th,
 .check-table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); }
 .check-table th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+
+/* Headline numbers on the home page, with their charts (src/app/trend-chart.tsx). */
+.headline-label { color: var(--muted); font-size: 0.875rem; }
+.headline-value { font-size: 2.4rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.trend { margin-top: 0.5rem; }
+.trend-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.trend .good { color: var(--good); }
+.trend .bad { color: var(--bad); }
+.trend-tabs { display: inline-flex; gap: 0.25rem; }
+.trend-tab {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.trend-tab.active { background: var(--surface-alt); color: var(--text); border-color: var(--surface-alt); }
+.trend-chart { display: block; width: 100%; height: auto; margin-top: 0.35rem; }
+.trend-grid { stroke: var(--border); stroke-width: 1; }
+.trend-axis { fill: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.trend-empty { margin: 0.5rem 0 0; }

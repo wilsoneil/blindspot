@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 26 Nov 2026 (pairs trained from own games need 25 positions)
+Last updated: 26 Nov 2026 (Phase 4: Blindspot rating headline and chart)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -147,7 +147,7 @@ Every attempt logs the result and the time taken; both feed the weakness score a
 
 ## Progress and headline metrics
 
-The home screen leads with the Blindspot rating as the primary number, with the Blitz gap shown smaller beneath it; each has a line chart over the last week, month and all time.
+The home screen leads with the Blindspot rating as the primary number, with the Blitz gap shown smaller beneath it; each has a line chart over the last week, month and all time. The rating is marked "provisional" while its Glicko-2 deviation is above 90 (twice the floor), and each chart shows the change over the chosen period.
 
 - **Blindspot rating:** one overall Glicko-2 rating across all rated Lichess puzzles attempted in the app (first attempts only). It only rises for solves that are correct and within target time. Each attempt is its own rating period against the puzzle's Lichess rating at the time (with a fixed deviation of 80, since stored puzzles have settled ratings); it starts at 1500 (deviation 350, volatility 0.06, τ 0.5) and the deviation never drops below 45, so it keeps responding. It is worked out by replaying the first attempts in order, so its full history can always be rebuilt. Puzzles are chosen around it, and it sets the "well above the user's level" part of the target time.
 - **Blitz gap:** daily rating minus blitz rating, from chess.com ratings fetched daily and smoothed as a 30-day average so a single bad session doesn't swing it. Shown in points, for example "600 and falling"; falling = closing the gap. Show both underlying ratings in small print.
