@@ -377,3 +377,7 @@ ol.weaknesses {
 .trend-grid { stroke: var(--border); stroke-width: 1; }
 .trend-axis { fill: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
 .trend-empty { margin: 0.5rem 0 0; }
+.gap-value { font-size: 1.6rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.gap-trend { font-weight: 400; color: var(--muted); }
+.gap-trend.falling { color: var(--good); }
+.gap-trend.rising { color: var(--bad); }
