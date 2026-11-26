@@ -4,6 +4,7 @@ import { ANALYSIS_VERSION } from "@/lib/analysis/eval";
 import { getAppContext } from "@/lib/app-data";
 import type { Db } from "@/lib/db";
 import { describeTimeControl, type Settings } from "@/lib/settings";
+import { blitzGap, SMOOTHING_DAYS, type RatingSample } from "@/lib/progress/blitz-gap";
 import { chartSeries } from "@/lib/progress/series";
 import { MIN_RD, ratingHistory } from "@/lib/training/rating";
 import { recentDrills } from "@/lib/training/stats";
@@ -47,12 +48,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   if (ctx.status !== "ready") return <SetupNotice ctx={ctx} />;
 
   const { settings } = ctx;
-  const [s, profiles, params, drills, history] = await Promise.all([
+  const [s, profiles, params, drills, history, gap] = await Promise.all([
     loadStatus(ctx.db, ctx.userId, settings),
     loadProfiles(ctx.db, ctx.userId),
     searchParams,
     recentDrills(ctx.db, ctx.userId),
     loadRating(ctx.db, ctx.userId),
+    loadBlitzGap(ctx.db, ctx.userId),
   ]);
   profiles.sort((a, b) => b.gamesAnalysed - a.gamesAnalysed);
 
@@ -65,6 +67,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   return (
     <>
       <RatingCard rating={history} />
+      {settings.chesscomUsername && <BlitzGapCard gap={gap} />}
 
       {!settings.chesscomUsername && (
         <section className="card notice">
@@ -179,3 +182,58 @@ function RatingCard({ rating }: { rating: Awaited<ReturnType<typeof loadRating>>
     </section>
   );
 }
+
+const PAGE = 1000;
+
+/** Blitz and daily ratings from every imported game and the daily snapshots, smoothed into the gap. */
+async function loadBlitzGap(db: Db, userId: string) {
+  const samples: RatingSample[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db.from("games").select("played_at, time_class, user_rating")
+      .eq("user_id", userId).in("time_class", ["blitz", "daily"]).not("user_rating", "is", null)
+      .order("id").range(from, from + PAGE - 1);
+    if (error) throw new Error(`Could not read game ratings: ${error.message}`);
+    for (const g of data) samples.push({ timeClass: g.time_class, t: new Date(g.played_at).getTime(), rating: g.user_rating });
+    if (data.length < PAGE) break;
+  }
+  const { data: snaps, error } = await db.from("rating_snapshots").select("taken_on, time_class, rating")
+    .eq("user_id", userId).in("time_class", ["blitz", "daily"]);
+  if (error) throw new Error(`Could not read rating snapshots: ${error.message}`);
+  // A snapshot is the rating when the day's import ran: put it at the start of that day,
+  // so games played later the same day come after it.
+  for (const r of snaps) samples.push({ timeClass: r.time_class, t: new Date(`${r.taken_on}T00:00:00Z`).getTime(), rating: r.rating });
+
+  const now = Date.now();
+  const gap = blitzGap(samples, now);
+  return gap && { ...gap, chart: chartSeries(gap.series, now) };
+}
+
+const TREND_WORDS = { falling: "and falling", rising: "and rising", steady: "and steady" } as const;
+
+/** The Blitz gap, smaller beneath the rating (SPEC.md -> "Progress and headline metrics"). */
+function BlitzGapCard({ gap }: { gap: Awaited<ReturnType<typeof loadBlitzGap>> }) {
+  if (!gap) {
+    return (
+      <section className="card">
+        <div className="headline-label">Blitz gap</div>
+        <p className="small muted" style={{ margin: "0.25rem 0 0" }}>
+          Appears once you have both a Daily and a Blitz rating on chess.com.
+        </p>
+      </section>
+    );
+  }
+  return (
+    <section className="card">
+      <div className="headline-label">Blitz gap</div>
+      <div className="gap-value">
+        {gap.gap} <span className={`small gap-trend ${gap.trend}`}>{TREND_WORDS[gap.trend]}</span>
+      </div>
+      <TrendChart series={gap.chart} label="Blitz gap" colour={2} goodWhen="down" initial="month" />
+      <p className="small muted" style={{ margin: "0.35rem 0 0" }}>
+        Daily {gap.daily.average} minus blitz {gap.blitz.average}, each a {SMOOTHING_DAYS}-day average.
+        Latest: daily {gap.daily.latest}, blitz {gap.blitz.latest}.
+      </p>
+    </section>
+  );
+}
+
