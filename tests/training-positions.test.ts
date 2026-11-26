@@ -154,4 +154,22 @@ describe("allowed weaknesses: own positions and Lichess puzzles, one of each in 
     expect(got).toHaveLength(4);
     expect(got.every((p) => !p.position)).toBe(true);
   });
+
+  it("also mixes in own positions for a pair with a label from the user's own games", () => {
+    expect(weaknessFromKey("defending+longMate:missed")).toMatchObject({ ownLabelKeys: ["defending", "longMate:missed"] });
+    expect(weaknessFromKey("defending")).not.toHaveProperty("ownLabelKeys"); // a single label: unchanged
+    expect(weaknessFromKey("fork:missed+rookEndgame")).not.toHaveProperty("ownLabelKeys");
+  });
+
+  it("fills up with own positions when the puzzles run short", async () => {
+    const { db } = fakeDb({
+      mistakes: [1, 2, 3, 4, 5].map((id) => mistake(id, { labels: ["longMate:allowed", "defending"] })),
+      puzzles: [puzzle("p1")].map((p) => ({ ...p, labels: ["longMate", "defending"] })),
+      puzzle_attempts: [],
+    });
+    const got = await selectFor(db, weaknessFromKey("defending+longMate:allowed")!, { userId: "u1", count: 5, level: 1500 });
+    expect(got).toHaveLength(5);
+    expect(got.filter((p) => !p.position).map((p) => p.id)).toEqual(["p1"]);
+    expect(new Set(got.map((p) => p.id)).size).toBe(5); // no position twice
+  });
 });

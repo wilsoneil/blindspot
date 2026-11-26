@@ -7,7 +7,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAppContext } from "@/lib/app-data";
 import {
-  MAX_PAIRS, MIN_GAMES, PAIR_MIN_GAMES, PAIR_MIN_LIFT, PAIR_MIN_PUZZLES, type PairCheck, type PairOutcome,
+  MAX_PAIRS, MIN_GAMES, PAIR_MIN_GAMES, PAIR_MIN_LIFT, PAIR_MIN_OWN_POSITIONS, PAIR_MIN_PUZZLES, type PairCheck, type PairOutcome,
 } from "@/lib/analysis/profile";
 import { describeProfileKey, profileKeyForSetting, reviewProfile } from "@/lib/weakness-store";
 import { SetupNotice } from "../../setup-notice";
@@ -30,7 +30,7 @@ const OUTCOME: Record<PairOutcome, string> = {
   shown: "Shown in the top list",
   parentNotInTop: "Broader label not near the top",
   notClearlyWorse: `Not clearly worse (under ${PAIR_MIN_LIFT}×)`,
-  fewPositions: `Under ${PAIR_MIN_PUZZLES} puzzles / positions`,
+  fewPositions: `Under ${PAIR_MIN_PUZZLES} puzzles / ${PAIR_MIN_OWN_POSITIONS} own positions`,
   anotherPairBetter: "Another pair scored higher",
   pairLimit: `Already ${MAX_PAIRS} stronger pairs`,
   outOfTop: "Passed, but not high enough",
@@ -102,7 +102,7 @@ export default async function ProfileCheckPage({ searchParams }: PageProps<"/set
           </div>
           <div className="stat">
             <div className="stat-value">{onlyPositions.length} / {positional.length}</div>
-            <div className="stat-label">positional pairs stopped only by the {PAIR_MIN_PUZZLES} rule</div>
+            <div className="stat-label">own-position pairs stopped only by having too few positions</div>
           </div>
         </div>
       </section>
@@ -138,12 +138,13 @@ export default async function ProfileCheckPage({ searchParams }: PageProps<"/set
         <h2>Pairs</h2>
         <p className="small muted">
           {pairs.length} pairs have mistakes in at least {PAIR_MIN_GAMES} games. Each is counted under the first rule it
-          failed. A positional pair (one label with no Lichess theme) counts your own mistakes as its positions.
+          failed. Pairs need {PAIR_MIN_PUZZLES} Lichess puzzles, or {PAIR_MIN_OWN_POSITIONS} of your own positions when
+          they are trained from your games (marked &ldquo;own&rdquo;).
         </p>
         <div className="table-wrap">
           <table className="check-table">
             <thead>
-              <tr><th>Outcome</th><th>Puzzle pairs</th><th>Positional</th></tr>
+              <tr><th>Outcome</th><th>Puzzle pairs</th><th>Own positions</th></tr>
             </thead>
             <tbody>
               {OUTCOME_ORDER.map((o) => {
@@ -155,7 +156,7 @@ export default async function ProfileCheckPage({ searchParams }: PageProps<"/set
           </table>
         </div>
 
-        <h3 style={{ marginTop: "1rem" }}>Stopped only by the {PAIR_MIN_PUZZLES} rule</h3>
+        <h3 style={{ marginTop: "1rem" }}>Stopped only by too few puzzles or positions</h3>
         <PairTable pairs={pairs.filter((p) => p.outcome === "fewPositions")} empty="None." />
 
         <h3 style={{ marginTop: "1rem" }}>Shown in the top list</h3>

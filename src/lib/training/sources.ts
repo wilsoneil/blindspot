@@ -5,11 +5,18 @@
 // each in turn: Lichess puzzles always put the user on the side playing the tactic, which
 // trains recognising it; the user's own positions train finding the move that doesn't allow
 // it. When the own positions run out, it carries on with puzzles alone.
+//
+// A pair with a label that is also trained from the user's own games (e.g. "defending",
+// which has Lichess "equality" puzzles too) gets the same mix, and when the Lichess puzzles
+// run short (no puzzle is both a long mate and an equality puzzle), own positions fill in.
 
 import type { Db } from "../db";
+import { labelForKey } from "../labels";
 import { openingCandidates } from "./openings";
 import { selectPositions } from "./positions";
 import { attemptedPuzzleIds, selectPuzzles, trainingSource, type TrainingPuzzle } from "./select";
+
+const fromOwnGames = (key: string) => labelForKey(key)?.fromOwnGames === true;
 
 export type Weakness =
   /** `ownLabelKeys`: for an "allowed" weakness, also the user's own positions with these labels. */
@@ -27,8 +34,8 @@ export function weaknessFromKey(key: string): Weakness | null {
   const labels = key.split("+");
   const s = trainingSource(labels);
   if (s.kind === "puzzles") {
-    const allowed = labels.some((l) => l.endsWith(":allowed"));
-    return allowed
+    const ownToo = labels.some((l) => l.endsWith(":allowed")) || (labels.length > 1 && labels.some(fromOwnGames));
+    return ownToo
       ? { key, kind: "puzzles", puzzleLabels: s.puzzleLabels, ownLabelKeys: labels }
       : { key, kind: "puzzles", puzzleLabels: s.puzzleLabels };
   }
@@ -75,7 +82,16 @@ export async function selectFor(db: Pick<Db, "from">, w: Weakness, o: ItemSelect
       userId: o.userId, labelKeys: w.ownLabelKeys, count: Math.ceil(o.count / 2), level: o.level, near: o.near,
       exclude: o.exclude, random: o.random,
     });
-    return alternate(own, await puzzlesFor(o.count - own.length));
+    const puzzles = await puzzlesFor(o.count - own.length);
+    // Too few puzzles: fill up with more own positions.
+    const short = o.count - own.length - puzzles.length;
+    const more = short > 0
+      ? await selectPositions(db, {
+        userId: o.userId, labelKeys: w.ownLabelKeys, count: short, level: o.level, near: o.near,
+        exclude: [...(o.exclude ?? []), ...own.map((p) => p.id)], random: o.random,
+      })
+      : [];
+    return [...alternate(own, puzzles), ...more];
   }
   return selectPositions(db, {
     userId: o.userId, labelKeys: w.labelKeys, count: o.count, level: o.level, near: o.near, exclude: o.exclude, random: o.random,

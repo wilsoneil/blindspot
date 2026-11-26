@@ -13,7 +13,7 @@
 //      mistakes in at least three distinct games to enter the top list.
 // Then blend with puzzle performance (from Phase 3) and scale 0-100 against each other.
 
-import { describeLabelKey, familyOfKey, LABELS, puzzleLabelForKey } from "../labels";
+import { describeLabelKey, familyOfKey, labelForKey, LABELS, puzzleLabelForKey } from "../labels";
 import { MOTIF_PUZZLES } from "./motif-frequency";
 import { assignOpenings, describeOpening, type GameOpening } from "./openings";
 
@@ -22,6 +22,8 @@ export const PRIOR_GAMES = 10; // how hard small samples are pulled towards the 
 export const PAIR_MIN_GAMES = 8;
 export const PAIR_MIN_LIFT = 1.25; // "clearly worse than the broader label on its own"
 export const PAIR_MIN_PUZZLES = 200;
+/** For a pair trained with the user's own positions (each is used once), fewer will do. */
+export const PAIR_MIN_OWN_POSITIONS = 25;
 export const PAIR_PRIOR_COST = 1; // pulls a pair's lift towards 1 (about three average mistakes)
 export const MAX_PAIRS = 2;
 export const TOP_LIST_SIZE = 8; // the most the "number of weaknesses shown" setting allows
@@ -91,7 +93,7 @@ export type PairOutcome =
   | "shown" // replaces its broader label in the top list
   | "parentNotInTop" // its broader label isn't near the top, so it couldn't matter
   | "notClearlyWorse" // lift below PAIR_MIN_LIFT
-  | "fewPositions" // fewer than PAIR_MIN_PUZZLES puzzles (or own positions)
+  | "fewPositions" // under PAIR_MIN_PUZZLES puzzles, or PAIR_MIN_OWN_POSITIONS own positions
   | "anotherPairBetter" // another pair scored higher for the same broader label
   | "pairLimit" // passed, but MAX_PAIRS stronger pairs were already in
   | "outOfTop"; // passed, but still not high enough for the top list
@@ -105,7 +107,7 @@ export interface PairCheck {
   mistakes: number;
   lift: number;
   score: number;
-  /** True when one label has no Lichess theme, so its "puzzles" are the user's own mistakes. */
+  /** True when it is trained with the user's own positions (its own mistakes), not Lichess puzzles. */
   positional: boolean;
   /** Matching Lichess puzzles, or own positions for a positional pair. */
   positions: number;
@@ -300,7 +302,7 @@ export async function buildProfile(games: ProfileGame[], mistakes: ProfileMistak
   const bestPairFor = new Map<string, WeaknessEntry>();
   const checks: PairCheck[] = [];
   // The review counts positions for every pair: ask the database for them in parallel, not one by one.
-  const reviewPositions = new Map<string, number>();
+  const reviewPositions = new Map<string, TrainingPositions>();
   if (o.review) {
     const todo = [...pairs].filter(([, s]) => s.games.size >= PAIR_MIN_GAMES);
     for (let i = 0; i < todo.length; i += 10) {
@@ -320,16 +322,16 @@ export async function buildProfile(games: ProfileGame[], mistakes: ProfileMistak
     const failed: PairOutcome | null =
       !inTop.has(parent) ? "parentNotInTop" : lift < PAIR_MIN_LIFT ? "notClearlyWorse" : null;
     if (o.review) {
-      const positions = reviewPositions.get(pk)!;
+      const t = reviewPositions.get(pk)!;
       checks.push({
         key: pk, name: describeKey(pk), parent, games: s.games.size, mistakes: s.mistakes, lift, score,
-        positional: !(puzzleLabelForKey(a) && puzzleLabelForKey(b)), positions,
-        outcome: failed ?? (positions < PAIR_MIN_PUZZLES ? "fewPositions" : "anotherPairBetter"), // settled below
+        positional: t.own, positions: t.count,
+        outcome: failed ?? (enough(t) ? "anotherPairBetter" : "fewPositions"), // settled below
       });
     }
     if (failed) continue;
     if ((bestPairFor.get(parent)?.score ?? 0) >= score) continue;
-    if ((await trainingPositions(a, b, s, o)) < PAIR_MIN_PUZZLES) continue;
+    if (!enough(await trainingPositions(a, b, s, o))) continue;
     bestPairFor.set(parent, entry(pk, [a, b], s, score));
   }
 
@@ -399,12 +401,27 @@ function familyChecks(
   return [...out.values()].sort((x, y) => y.inTop8 - x.inTop8 || y.highest - x.highest || x.family.localeCompare(y.family));
 }
 
+interface TrainingPositions {
+  count: number;
+  /** Counted from the user's own mistakes rather than Lichess puzzles. */
+  own: boolean;
+}
+
+const enough = (t: TrainingPositions) => t.count >= (t.own ? PAIR_MIN_OWN_POSITIONS : PAIR_MIN_PUZZLES);
+
 /**
- * Positions available to train a pair: Lichess puzzles with both labels, or, when either
- * label is positional (no Lichess theme), the user's own mistakes with both labels.
+ * Positions available to train a pair: Lichess puzzles with both labels, or the user's own
+ * mistakes with both labels when either label is positional (no Lichess theme), or when the
+ * puzzles fall short and either label is also trained from own games (e.g. "defending":
+ * no Lichess puzzle is both a long mate and an equality puzzle). Training does the same
+ * (src/lib/training/sources.ts).
  */
-async function trainingPositions(a: string, b: string, s: Stats, o: ProfileOptions): Promise<number> {
+async function trainingPositions(a: string, b: string, s: Stats, o: ProfileOptions): Promise<TrainingPositions> {
   const [pa, pb] = [puzzleLabelForKey(a), puzzleLabelForKey(b)];
-  if (pa && pb) return o.countPuzzles([pa, pb]);
-  return s.mistakes;
+  if (pa && pb) {
+    const puzzles = await o.countPuzzles([pa, pb]);
+    const ownToo = labelForKey(a)?.fromOwnGames || labelForKey(b)?.fromOwnGames;
+    if (puzzles >= PAIR_MIN_PUZZLES || !ownToo) return { count: puzzles, own: false };
+  }
+  return { count: s.mistakes, own: true };
 }
