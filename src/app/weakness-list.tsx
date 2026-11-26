@@ -18,32 +18,6 @@ export function WeaknessList({ profile, shown, themes = {}, trends = {} }: {
   trends?: Record<string, Trend>;
 }) {
   const top = profile.top.slice(0, shown);
-  // Next to the Rush and Survival buttons; it drops below them while open.
-  const howToRead = (
-    <details className="how-to-read small muted">
-      <summary>How to read this</summary>
-      <ul>
-        <li>
-          <strong>The number and bar:</strong> how weak each area is compared with the rest of your game; 100 is your
-          weakest. From {profile.gamesAnalysed.toLocaleString()} analysed games and {profile.mistakes.toLocaleString()} mistakes,
-          updated {formatDate(profile.computedAt)}.
-        </li>
-        <li>
-          <strong>Puzzles:</strong> your rating on puzzles with this theme (from {MIN_THEME_ATTEMPTS} puzzles), and its change
-          over 30 days. <strong>Positions:</strong> the share of positions from your own games you solved in time.
-        </li>
-        <li>
-          <strong>Games:</strong> the winning chance these mistakes lose you per game, recent games counting more. It comes
-          from games only, so it falls as training carries over; the arrow compares it with a month ago. A mistake with
-          several labels counts for each, so the figures don&rsquo;t add up to a total.
-        </li>
-        <li>
-          <strong>Drill</strong> trains one weakness; <strong>Rush</strong> and <strong>Survival</strong> mix them all.
-          Weaknesses Lichess puzzles can&rsquo;t train use positions from your own games.
-        </li>
-      </ul>
-    </details>
-  );
   return (
     <>
       <ol className="weaknesses">
@@ -74,9 +48,8 @@ export function WeaknessList({ profile, shown, themes = {}, trends = {} }: {
         <div className="modes">
           <Link className="button" href={`/train/rush?tc=${encodeURIComponent(profile.profileKey)}`}>Rush</Link>
           <Link className="button" href={`/train/survival?tc=${encodeURIComponent(profile.profileKey)}`}>Survival</Link>
-          {howToRead}
         </div>
-      ) : howToRead}
+      ) : null}
       {top.length < shown && (
         <p className="small muted">
           Only {top.length} {top.length === 1 ? "area has" : "areas have"} enough evidence so far (mistakes in at least three games).
@@ -132,3 +105,31 @@ function Sparkline({ points }: { points: number[] }) {
   );
 }
 
+/** "How to read this", pinned to the top right of the weaknesses box (its text opens below the title). */
+export function HowToRead({ profile }: { profile: StoredProfile }) {
+  return (
+    <details className="how-to-read small muted">
+      <summary>How to read this</summary>
+      <ul>
+        <li>
+          <strong>The number and bar:</strong> how weak each area is compared with the rest of your game; 100 is your
+          weakest. From {profile.gamesAnalysed.toLocaleString()} analysed games and {profile.mistakes.toLocaleString()} mistakes,
+          updated {formatDate(profile.computedAt)}.
+        </li>
+        <li>
+          <strong>Puzzles:</strong> your rating on puzzles with this theme (from {MIN_THEME_ATTEMPTS} puzzles), and its change
+          over 30 days. <strong>Positions:</strong> the share of positions from your own games you solved in time.
+        </li>
+        <li>
+          <strong>Games:</strong> the winning chance these mistakes lose you per game, recent games counting more. It comes
+          from games only, so it falls as training carries over; the arrow compares it with a month ago. A mistake with
+          several labels counts for each, so the figures don&rsquo;t add up to a total.
+        </li>
+        <li>
+          <strong>Drill</strong> trains one weakness; <strong>Rush</strong> and <strong>Survival</strong> mix them all.
+          Weaknesses Lichess puzzles can&rsquo;t train use positions from your own games.
+        </li>
+      </ul>
+    </details>
+  );
+}

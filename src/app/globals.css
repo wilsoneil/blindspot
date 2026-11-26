@@ -384,5 +384,8 @@ ol.weaknesses {
 .how-to-read summary { cursor: pointer; color: var(--accent); }
 .how-to-read ul { margin: 0.4rem 0 0; padding-left: 1.1rem; }
 .how-to-read li { margin-bottom: 0.3rem; }
-.modes .how-to-read { margin: 0 0 0 0.25rem; }
-.modes .how-to-read[open] { flex-basis: 100%; margin-left: 0; }
+/* The weaknesses box: "How to read this" stays in the top right corner; its text opens below the title. */
+.card-head { position: relative; }
+.card-head h1 { padding-right: 8.5rem; }
+.card-head .how-to-read { margin: 0 0 0.5rem; }
+.card-head .how-to-read summary { position: absolute; top: 0.3rem; right: 0; }

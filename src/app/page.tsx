@@ -14,7 +14,7 @@ import {
 } from "@/lib/weakness-store";
 import { SetupNotice } from "./setup-notice";
 import { CompactTrend } from "./trend-chart";
-import { WeaknessList } from "./weakness-list";
+import { HowToRead, WeaknessList } from "./weakness-list";
 
 export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const ctx = await getAppContext();
@@ -52,7 +52,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
       )}
 
       <section className="card">
-        <h1>Top weaknesses <span className="pill">{describeProfileKey(selectedKey)}</span></h1>
+        <div className="card-head">
+          {/* The time-control toggle below names the profile; the tag only shows when there is no toggle. */}
+          <h1>Top weaknesses{profiles.length <= 1 && <> <span className="pill">{describeProfileKey(selectedKey)}</span></>}</h1>
+          {profile && profile.top.length > 0 && <HowToRead profile={profile} />}
+        </div>
         {profiles.length > 1 && (
           <nav className="filters" aria-label="Time control">
             {profiles.map((p) => (
