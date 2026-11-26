@@ -8,7 +8,8 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 - Phase 1 (Foundations, including login): done. Sign-in live; games imported (daily import scheduled); puzzle store built (155,285 puzzles, every label covered; labels reviewed against the full Lichess database)
 - Phase 2 (Analysis): done. Migration 0004 applied; 12-month backlog analysed (684 blitz games, 2,560 mistakes); the first real profile looks sensible (a mix of single labels and endgame pairs). Daily analysis runs after the import
 - Phase 3 (Training): done. Decisions in SPEC.md (target time, repetition schedule, accepted moves; Blindspot rating calculated from Phase 3, shown in Phase 4). Steps 1–12 done; migrations 0005 and 0006 applied, positions backlog filled (2,570), all games re-analysed with analysis version 2. Feedback rounds since: Blindspot mode dropped, Rush fixed at 5 minutes with 3 lives, run stats, "Your game" tag, allowed weaknesses mix own positions 1:1 with Lichess puzzles
-- Phase 4 (Progress): in progress (plan below). Showing the Blindspot rating, Blitz gap, theme ratings, charts (SPEC.md "Build phases")
+- Phase 4 (Progress): done. Blindspot rating and Blitz gap with charts, a rating and a games trend per weakness; migration 0007 applied, weakness history backfilled; home page simplified after feedback
+- Phase 5 (AI explanations): next. Costs money and needs an API key: agree the provider, model and budget with the user before any code (SPEC.md "Build phases")
 
 ### Phase 3 plan (one pull request per step)
 
@@ -34,7 +35,7 @@ Update this section when a phase is finished.
 3. Theme ratings: a Glicko-2 rating per weakness from first attempts at puzzles carrying its labels, on each row of the top-weaknesses list: **done** (`src/lib/progress/theme-ratings.ts`; own-position weaknesses show the share solved; openings none yet)
 4. Weakness trend from games: **done**; migration 0007 applied and history backfilled (48 weeks blitz, 47 daily) (`weakness_history`; written by the daily analysis job via `rebuildProfiles(..., { history: true })`, whose first run backfills weekly points; `src/lib/progress/weakness-trend.ts`; shown per weakness as cost per game with a sparkline)
    - Feedback: home page simplified (one progress line per weakness, "How to read this" folded away, "Your data" moved to Settings, the "drilled this week" line dropped)
-5. Review; mark Phase 4 done
+5. Review; mark Phase 4 done: **done** (every SPEC.md "Progress and headline metrics" item built; gaps below)
 
 ### Notes for later phases
 
@@ -44,6 +45,7 @@ Update this section when a phase is finished.
 - **Tactics dominance (step 12, Nov 2026):** the profile check showed all of the top eight were tactics or mates (tactics peaking at 3.3–3.7, openings at 1.1 despite 28 labels): every tactic counted every game as exposure, so common motifs scored high for being common. Fixed by weighting each tactic's and mate's exposure by its share of all Lichess puzzles (`src/lib/analysis/motif-frequency.ts`, from the "Motif frequencies" block of a puzzle build dry run). After the fix: tactics peaks 3.2–3.3, mates up to 3.0 (long mates replaced short ones), rare motifs didn't jump; top five still all tactics and mates, accepted as real.
 - **Later, Rush length:** Rush is fixed at 5 minutes (`RUSH_MINUTES`). Bringing back a 3/5/10-minute choice needs a migration so `training_sessions` records each run's length, and `runStats` comparing like with like. The old `settings.rush_minutes` column is unused.
 - **Analysis version 2 (Nov 2026):** tactic tags only for lines that win material or mate (`scripts/tagger/tag.py`); "defensive move (allowed)" never scored (`NOT_SCORED` in `src/lib/analysis/profile.ts`). Re-analysis updates mistakes in place (by game and move), so attempts at own positions survive it.
+- **Phase 4 gaps (Nov 2026):** openings have no theme rating (their puzzles are found by `OpeningTags`, not labels; would need attempts to record the weakness they were served for). The home page reads all first attempts twice (`ratingHistory` and the theme ratings); merge into one query if it gets slow. The Blitz gap carries the last Daily rating forward, so it goes stale if Daily games stop.
 - **After that:** consider a quarterly automatic puzzle rebuild (a `schedule` in `.github/workflows/build-puzzles.yml`, like the daily import), to pick up Lichess's monthly updates.
 
 ## How to work
