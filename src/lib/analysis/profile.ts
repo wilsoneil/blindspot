@@ -299,6 +299,17 @@ export async function buildProfile(games: ProfileGame[], mistakes: ProfileMistak
   const inTop = new Set(all.slice(0, TOP_LIST_SIZE + MAX_PAIRS).map((e) => e.key));
   const bestPairFor = new Map<string, WeaknessEntry>();
   const checks: PairCheck[] = [];
+  // The review counts positions for every pair: ask the database for them in parallel, not one by one.
+  const reviewPositions = new Map<string, number>();
+  if (o.review) {
+    const todo = [...pairs].filter(([, s]) => s.games.size >= PAIR_MIN_GAMES);
+    for (let i = 0; i < todo.length; i += 10) {
+      await Promise.all(todo.slice(i, i + 10).map(async ([pk, s]) => {
+        const [a, b] = pk.split("+");
+        reviewPositions.set(pk, await trainingPositions(a, b, s, o));
+      }));
+    }
+  }
   for (const [pk, s] of pairs) {
     if (s.games.size < PAIR_MIN_GAMES) continue;
     const [a, b] = pk.split("+");
@@ -309,7 +320,7 @@ export async function buildProfile(games: ProfileGame[], mistakes: ProfileMistak
     const failed: PairOutcome | null =
       !inTop.has(parent) ? "parentNotInTop" : lift < PAIR_MIN_LIFT ? "notClearlyWorse" : null;
     if (o.review) {
-      const positions = await trainingPositions(a, b, s, o);
+      const positions = reviewPositions.get(pk)!;
       checks.push({
         key: pk, name: describeKey(pk), parent, games: s.games.size, mistakes: s.mistakes, lift, score,
         positional: !(puzzleLabelForKey(a) && puzzleLabelForKey(b)), positions,
