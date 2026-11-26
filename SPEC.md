@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 26 Nov 2026 (Phase 4: weakness trend from games)
+Last updated: 26 Nov 2026 (simpler home page)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -60,7 +60,7 @@ A scheduled job pulls new games daily, runs Stockfish over them and turns the mi
 
 ## Weakness profile
 
-The home screen shows the top weaknesses (default five) for the selected time control, each with a 0–100 severity score; the user picks which one to train.
+The home screen shows the top weaknesses (default five) for the selected time control, each with a 0–100 severity score; the user picks which one to train. Each row is kept to its name, the severity with a bar, and one line of progress ("Puzzles 1642 ↑38 · Games 3.1% ↓" with a sparkline, see "Progress and headline metrics"); the explanations sit behind a "How to read this" link under the list, closed by default. Import and analysis totals ("Your data") are on the settings page; the home page shows analysis progress only while games are waiting.
 
 - Weaknesses can be tactical themes, openings, endgame types, game phases, move types or position states
 - Separate profiles per time control, with a filter; 5-minute is the default
@@ -68,7 +68,6 @@ The home screen shows the top weaknesses (default five) for the selected time co
     - **Games:** how often the pattern causes mistakes, weighted by how costly they were and how recent
     - **Puzzles:** accuracy and solve time on that theme; slow solves count as "not yet automatic"
 - Scores refresh as new games and puzzle results arrive
-- Under each weakness, a line shows recent Drill practice on it: puzzles drilled in the last 7 days (repeats included) and the share solved correctly within target time. Puzzles met in Rush or Survival don't count towards it
 
 ### Categories
 
@@ -151,7 +150,7 @@ The home screen leads with the Blindspot rating as the primary number, with the 
 
 - **Blindspot rating:** one overall Glicko-2 rating across all rated Lichess puzzles attempted in the app (first attempts only). It only rises for solves that are correct and within target time. Each attempt is its own rating period against the puzzle's Lichess rating at the time (with a fixed deviation of 80, since stored puzzles have settled ratings); it starts at 1500 (deviation 350, volatility 0.06, τ 0.5) and the deviation never drops below 45, so it keeps responding. It is worked out by replaying the first attempts in order, so its full history can always be rebuilt. Puzzles are chosen around it, and it sets the "well above the user's level" part of the target time.
 - **Blitz gap:** daily rating minus blitz rating, from chess.com ratings fetched daily and smoothed as a 30-day average so a single bad session doesn't swing it. Shown in points, for example "600 and falling"; falling = closing the gap. Show both underlying ratings in small print. The history also uses the rating saved with every imported game (chess.com's rating after that game), so the chart covers the whole import from the start; each day takes the latest rating for each time control, carried forward over days without games. "Falling" or "rising" compares with 30 days earlier; a change under 5 points is "steady".
-- Underneath: a rating per weakness theme (leading indicator) and each weakness score's trend from games (lagging indicator, showing whether training carries over to real play). The theme rating is shown on each row of the top-weaknesses list: a Glicko-2 rating replayed, like the Blindspot rating, from the first attempts at Lichess puzzles carrying all the weakness's labels (both, for a pair), shown once there are 10, with its change over the last 30 days. Weaknesses trained with the user's own positions show the share solved within the target time instead; openings show none yet. The trend from games is shown on each row too: the share of winning chance the weakness costs per game (from games only, recency-weighted with the profile's half-life, so it can fall as the user improves, unlike the relative severity), with a sparkline of the last four months and whether it is down or up on a month ago (a change under 10% is steady). The daily analysis job saves one point a day per weakness (`weakness_history`, migration 0007); its first run fills in the past with one point a week.
+- Underneath: a rating per weakness theme (leading indicator) and each weakness score's trend from games (lagging indicator, showing whether training carries over to real play). The theme rating is shown on each row of the top-weaknesses list: a Glicko-2 rating replayed, like the Blindspot rating, from the first attempts at Lichess puzzles carrying all the weakness's labels (both, for a pair), shown once there are 10, with its change over the last 30 days. Weaknesses trained with the user's own positions show the share solved within the target time instead; openings show none yet. The trend from games is shown on each row too: the share of winning chance the weakness costs per game (from games only, recency-weighted with the profile's half-life, so it can fall as the user improves, unlike the relative severity), with a sparkline of the last four months and whether it is down or up on a month ago (a change under 10% is steady). On the row it reads "Games 3.1% ↓" (green arrow when falling, red when rising, none when steady), explained under "How to read this". The daily analysis job saves one point a day per weakness (`weakness_history`, migration 0007); its first run fills in the past with one point a week.
 
 ## Settings
 
