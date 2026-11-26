@@ -32,7 +32,7 @@ Update this section when a phase is finished.
 1. Blindspot rating headline on the home page, with a week / month / all-time chart (hand-drawn SVG, theme chart colours, no chart library): **done** (`src/app/trend-chart.tsx`, `src/lib/progress/series.ts`, `ratingHistory` in `src/lib/training/rating.ts`)
 2. Blitz gap: daily minus blitz rating, each a 30-day average, "600 and falling", chart, both ratings in small print: **done** (`src/lib/progress/blitz-gap.ts`; history from `games.user_rating` plus `rating_snapshots`)
 3. Theme ratings: a Glicko-2 rating per weakness from first attempts at puzzles carrying its labels, on each row of the top-weaknesses list: **done** (`src/lib/progress/theme-ratings.ts`; own-position weaknesses show the share solved; openings none yet)
-4. Weakness trend from games: migration 0007 (score history per profile and key), written by the daily rebuild; one-off backfill replaying the profile at past dates; shown per weakness
+4. Weakness trend from games: **done in code, needs migration 0007 applied** (`weakness_history`; written by the daily analysis job via `rebuildProfiles(..., { history: true })`, whose first run backfills weekly points; `src/lib/progress/weakness-trend.ts`; shown per weakness as cost per game with a sparkline)
 5. Review; mark Phase 4 done
 
 ### Notes for later phases
@@ -64,7 +64,7 @@ Update this section when a phase is finished.
 
 - `npm run dev`: local site; `npm test`: tests; `npm run lint`; `npm run build`
 - `npm run import:games`, `npm run analyse:games -- --limit 5`, `npm run find:moves`, `npm run build:puzzles -- --dry-run`: data jobs (also GitHub Actions workflows)
-- Database changes go in a new numbered file in `supabase/migrations/`; never edit an applied one.
+- Database changes go in a new numbered file in `supabase/migrations/`; never edit an applied one. When a migration needs applying, paste its SQL in the chat, ready to copy into the Supabase SQL editor (comments can be left out); don't just link to the file or the pull request.
 - Next.js here is 16.x, newer than most training data: check `node_modules/next/dist/docs/` before using an unfamiliar API (see AGENTS.md). Cache Components is deliberately off.
 
 ## Stack

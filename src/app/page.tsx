@@ -10,7 +10,7 @@ import { themeRating, type ThemeAttempt, type ThemeRating } from "@/lib/progress
 import { MIN_RD, ratingHistory } from "@/lib/training/rating";
 import { recentDrills } from "@/lib/training/stats";
 import {
-  ANALYSED_TIME_CLASSES, describeProfileKey, historyStart, loadProfiles, profileKeyForSetting,
+  ANALYSED_TIME_CLASSES, describeProfileKey, historyStart, loadProfiles, loadWeaknessTrends, profileKeyForSetting,
 } from "@/lib/weakness-store";
 import { SetupNotice } from "./setup-notice";
 import { TrendChart } from "./trend-chart";
@@ -64,6 +64,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const asked = typeof params.tc === "string" ? params.tc : null;
   const selectedKey = asked && profiles.some((p) => p.profileKey === asked) ? asked : focusKey;
   const profile = profiles.find((p) => p.profileKey === selectedKey);
+  const trends = profile
+    ? await loadWeaknessTrends(ctx.db, ctx.userId, profile.profileKey, profile.top.map((w) => w.key))
+    : {};
   const total = s.analysed + s.waiting;
 
   return (
@@ -96,7 +99,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         )}
         {profile && profile.top.length > 0 ? (
           <WeaknessList profile={profile} shown={settings.weaknessesShown} drills={drills}
-            themes={themeRatings(profile.top.map((w) => w.key), themeAttempts)} />
+            themes={themeRatings(profile.top.map((w) => w.key), themeAttempts)} trends={trends} />
         ) : (
           <p className="muted" style={{ marginBottom: 0 }}>
             {s.analysed === 0

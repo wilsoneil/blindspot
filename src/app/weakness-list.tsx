@@ -4,16 +4,19 @@ import Link from "next/link";
 import { describeKey } from "@/lib/analysis/profile";
 import { weaknessFromKey } from "@/lib/training/sources";
 import { MIN_THEME_ATTEMPTS, type ThemeRating } from "@/lib/progress/theme-ratings";
+import type { Trend } from "@/lib/progress/weakness-trend";
 import type { DrillStat } from "@/lib/training/stats";
 import type { StoredProfile } from "@/lib/weakness-store";
 
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
-export function WeaknessList({ profile, shown, drills = {}, themes = {} }: {
+export function WeaknessList({ profile, shown, drills = {}, themes = {}, trends = {} }: {
   profile: StoredProfile; shown: number; drills?: Record<string, DrillStat>;
   /** Rating (or share solved) per weakness, from puzzles: the leading indicator. */
   themes?: Record<string, ThemeRating>;
+  /** Cost per game in real games over time: the lagging indicator. */
+  trends?: Record<string, Trend>;
 }) {
   const top = profile.top.slice(0, shown);
   return (
@@ -42,6 +45,7 @@ export function WeaknessList({ profile, shown, drills = {}, themes = {} }: {
               {w.mistakes} mistake{w.mistakes === 1 ? "" : "s"} in {w.games} game{w.games === 1 ? "" : "s"}
             </div>
             {themes[w.key] && <ThemeLine r={themes[w.key]} />}
+            {trends[w.key] && <TrendLine t={trends[w.key]} />}
             {drills[w.key] && (
               <div className="small weakness-training">
                 ▶ {drills[w.key].attempted} puzzle{drills[w.key].attempted === 1 ? "" : "s"} drilled this week
@@ -96,6 +100,37 @@ function ThemeLine({ r }: { r: ThemeRating }) {
       )}
       {" "}· {r.attempts} puzzles
     </div>
+  );
+}
+
+const pct = (x: number) => `${(100 * x).toFixed(1)}%`;
+
+/** "In games: costs 3.1% a game, down from 4.2% a month ago", with a sparkline. */
+function TrendLine({ t }: { t: Trend }) {
+  return (
+    <div className="small muted">
+      <Sparkline points={t.points.map((p) => p.v)} />
+      <span>
+        In games: costs {pct(t.now)} a game
+        {t.direction === "falling" && <span className="theme-up">, down from {pct(t.then!)} a month ago</span>}
+        {t.direction === "rising" && <span className="theme-down">, up from {pct(t.then!)} a month ago</span>}
+        {t.direction === "steady" && <>, steady over the month</>}
+      </span>
+    </div>
+  );
+}
+
+/** A tiny line of the last few months, no axes. */
+function Sparkline({ points }: { points: number[] }) {
+  if (points.length < 2) return null;
+  const [w, h] = [48, 14];
+  const [lo, hi] = [Math.min(...points), Math.max(...points)];
+  const y = (v: number) => (hi > lo ? h - 1 - ((v - lo) / (hi - lo)) * (h - 2) : h / 2);
+  const line = points.map((v, i) => `${((i / (points.length - 1)) * w).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  return (
+    <svg className="sparkline" width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
+      <polyline points={line} fill="none" stroke="var(--chart-2)" strokeWidth={1.5} strokeLinejoin="round" />
+    </svg>
   );
 }
 

@@ -183,7 +183,7 @@ async function main() {
     await Promise.all(Array.from({ length: Math.max(1, workers) }, worker));
 
     console.log(`${label}: ${taken} games done this run, ${total - taken} still to analyse`);
-    const keys = await withRetry(() => rebuildProfiles(db, u.user_id, settings));
+    const keys = await withRetry(() => rebuildProfiles(db, u.user_id, settings, new Date(), { history: true }));
     console.log(`${label}: weakness profiles rebuilt for ${keys.length} time controls`);
   }
 
