@@ -8,7 +8,7 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 - Phase 1 (Foundations, including login): done. Sign-in live; games imported (daily import scheduled); puzzle store built (155,285 puzzles, every label covered; labels reviewed against the full Lichess database)
 - Phase 2 (Analysis): done. Migration 0004 applied; 12-month backlog analysed (684 blitz games, 2,560 mistakes); the first real profile looks sensible (a mix of single labels and endgame pairs). Daily analysis runs after the import
 - Phase 3 (Training): done. Decisions in SPEC.md (target time, repetition schedule, accepted moves; Blindspot rating calculated from Phase 3, shown in Phase 4). Steps 1–12 done; migrations 0005 and 0006 applied, positions backlog filled (2,570), all games re-analysed with analysis version 2. Feedback rounds since: Blindspot mode dropped, Rush fixed at 5 minutes with 3 lives, run stats, "Your game" tag, allowed weaknesses mix own positions 1:1 with Lichess puzzles
-- Phase 4 (Progress): next. Showing the Blindspot rating, Blitz gap, theme ratings, charts (SPEC.md "Build phases")
+- Phase 4 (Progress): in progress (plan below). Showing the Blindspot rating, Blitz gap, theme ratings, charts (SPEC.md "Build phases")
 
 ### Phase 3 plan (one pull request per step)
 
@@ -26,6 +26,14 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 12. Review: positional pairs' 200 rule, tactics dominance: **done**. Profile check page (`/settings/profile-check`, `review: true` in `buildProfile`); tactics and mates scored against how common each motif is (`motif-frequency.ts`); pairs trained from own games need 25 positions (`PAIR_MIN_OWN_POSITIONS`). Tactics and mates still fill the top five after the fix: accepted as real, no cap
 
 Update this section when a phase is finished.
+
+### Phase 4 plan (one pull request per step)
+
+1. Blindspot rating headline on the home page, with a week / month / all-time chart (hand-drawn SVG, theme chart colours, no chart library): **done** (`src/app/trend-chart.tsx`, `src/lib/progress/series.ts`, `ratingHistory` in `src/lib/training/rating.ts`)
+2. Blitz gap: daily minus blitz rating, each a 30-day average, "600 and falling", chart, both ratings in small print. History from `games.user_rating` plus `rating_snapshots`, so it has a year from the start
+3. Theme ratings: a Glicko-2 rating per weakness label from first attempts at puzzles carrying it, on each row of the top-weaknesses list
+4. Weakness trend from games: migration 0007 (score history per profile and key), written by the daily rebuild; one-off backfill replaying the profile at past dates; shown per weakness
+5. Review; mark Phase 4 done
 
 ### Notes for later phases
 

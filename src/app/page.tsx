@@ -4,11 +4,14 @@ import { ANALYSIS_VERSION } from "@/lib/analysis/eval";
 import { getAppContext } from "@/lib/app-data";
 import type { Db } from "@/lib/db";
 import { describeTimeControl, type Settings } from "@/lib/settings";
+import { chartSeries } from "@/lib/progress/series";
+import { MIN_RD, ratingHistory } from "@/lib/training/rating";
 import { recentDrills } from "@/lib/training/stats";
 import {
   ANALYSED_TIME_CLASSES, describeProfileKey, historyStart, loadProfiles, profileKeyForSetting,
 } from "@/lib/weakness-store";
 import { SetupNotice } from "./setup-notice";
+import { TrendChart } from "./trend-chart";
 import { formatDate, WeaknessList } from "./weakness-list";
 
 async function loadStatus(db: Db, userId: string, settings: Settings) {
@@ -44,11 +47,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   if (ctx.status !== "ready") return <SetupNotice ctx={ctx} />;
 
   const { settings } = ctx;
-  const [s, profiles, params, drills] = await Promise.all([
+  const [s, profiles, params, drills, history] = await Promise.all([
     loadStatus(ctx.db, ctx.userId, settings),
     loadProfiles(ctx.db, ctx.userId),
     searchParams,
     recentDrills(ctx.db, ctx.userId),
+    loadRating(ctx.db, ctx.userId),
   ]);
   profiles.sort((a, b) => b.gamesAnalysed - a.gamesAnalysed);
 
@@ -60,6 +64,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
 
   return (
     <>
+      <RatingCard rating={history} />
+
       {!settings.chesscomUsername && (
         <section className="card notice">
           <h2>Welcome</h2>
@@ -134,5 +140,42 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         </p>
       </section>
     </>
+  );
+}
+
+/** The Blindspot rating with its chart series (SPEC.md -> "Progress and headline metrics"). */
+async function loadRating(db: Db, userId: string) {
+  const history = await ratingHistory(db, userId);
+  const last = history.at(-1)?.rating;
+  const points = history.map((h) => ({ t: new Date(h.at).getTime(), v: Math.round(h.rating.rating) }));
+  return { last, count: history.length, series: chartSeries(points, Date.now()) };
+}
+
+/** The home page's headline number. */
+function RatingCard({ rating }: { rating: Awaited<ReturnType<typeof loadRating>> }) {
+  const { last, count, series } = rating;
+  if (!last) {
+    return (
+      <section className="card">
+        <div className="headline-label">Blindspot rating</div>
+        <p className="small muted" style={{ margin: "0.25rem 0 0" }}>
+          Your rating appears after your first puzzles in Drill, Rush or Survival.
+        </p>
+      </section>
+    );
+  }
+  // Glicko-2 is unsure of a new rating; say so until it has settled a little.
+  const provisional = last.rd > 2 * MIN_RD;
+  return (
+    <section className="card">
+      <div className="headline-label">Blindspot rating</div>
+      <div className="headline-value">
+        {Math.round(last.rating)}{provisional && <span className="small muted" style={{ fontWeight: 400 }}> provisional</span>}
+      </div>
+      <TrendChart series={series} label="Blindspot rating" initial="month" />
+      <p className="small muted" style={{ margin: "0.35rem 0 0" }}>
+        From your first attempts at {count.toLocaleString()} puzzle{count === 1 ? "" : "s"}. It only rises for puzzles solved within the target time.
+      </p>
+    </section>
   );
 }
