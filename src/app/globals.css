@@ -377,9 +377,6 @@ ol.weaknesses {
 }
 .mini-tab.active { background: var(--surface-alt); color: var(--text); }
 .compact-footnote { margin-top: 0.3rem; color: var(--muted); font-size: 0.75rem; }
-.gap-trend { font-weight: 400; color: var(--muted); }
-.gap-trend.falling { color: var(--good); }
-.gap-trend.rising { color: var(--bad); }
 .theme-up { color: var(--good); }
 .theme-down { color: var(--bad); }
 .sparkline { display: inline-block; vertical-align: -2px; margin-left: 0.25rem; }

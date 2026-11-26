@@ -156,8 +156,6 @@ async function loadBlitzGap(db: Db, userId: string) {
   return gap && { ...gap, chart: chartSeries(gap.series, now) };
 }
 
-const TREND_WORDS = { falling: "and falling", rising: "and rising", steady: "and steady" } as const;
-
 /** The Blitz gap, below the top weaknesses (SPEC.md -> "Progress and headline metrics"). */
 function BlitzGapCard({ gap }: { gap: Awaited<ReturnType<typeof loadBlitzGap>> }) {
   if (!gap) {
@@ -174,7 +172,7 @@ function BlitzGapCard({ gap }: { gap: Awaited<ReturnType<typeof loadBlitzGap>> }
     <section className="card compact-card">
       <CompactTrend
         title="Blitz gap"
-        value={<>{gap.gap < 0 ? `−${-gap.gap}` : gap.gap} <span className={`small gap-trend ${gap.trend}`}>{TREND_WORDS[gap.trend]}</span></>}
+        value={gap.gap < 0 ? `−${-gap.gap}` : gap.gap}
         footnote={<>Daily {gap.daily.average} − Blitz {gap.blitz.average} ({SMOOTHING_DAYS}-day averages)</>}
         series={gap.chart} label="Blitz gap" colour={2} goodWhen="down" />
     </section>
