@@ -1,5 +1,5 @@
 // An in-memory stand-in for the Supabase client, for tests. Supports the query methods the
-// app uses: select (with exact head counts), eq, in, not(col, "is", null), contains, gte,
+// app uses: select (with exact head counts), eq, in, not(col, "is", null), contains, gt, gte,
 // lte, lt, order (ascending or not), limit, range, maybeSingle, single, insert (with an id
 // column filled in and unique checks), update and delete. Records every query.
 
@@ -164,6 +164,11 @@ export function fakeDb(tables: Record<string, Row[]>, opts: FakeDbOptions = {}) 
       gte(col: string, v: number | string) {
         entry.filters.push(`${col}>=${v}`);
         filters.push((r) => (r[col] as number | string) >= v);
+        return builder;
+      },
+      gt(col: string, v: number | string) {
+        entry.filters.push(`${col}>${v}`);
+        filters.push((r) => (r[col] as number | string) > v);
         return builder;
       },
       lte(col: string, v: number) {

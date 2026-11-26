@@ -1,14 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { selectPuzzles, sliceOffsets, trainingSource } from "../src/lib/training/select";
+import { randomId, selectPuzzles, trainingSource } from "../src/lib/training/select";
 import { fakeDb } from "./fake-db";
 
 const USER = "user-1";
 const OTHER = "user-2";
 
-/** Made-up puzzles: ids sort in creation order, ratings and labels as given. */
+const CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+/** A five-character id spread over the whole range, like Lichess's random ids. */
+const spreadId = (i: number) => {
+  let n = (i * 104729 + 7) % 62 ** 5;
+  return Array.from({ length: 5 }, () => { const c = CHARS[n % 62]; n = Math.floor(n / 62); return c; }).reverse().join("");
+};
+
+/** Made-up puzzles with ids spread like Lichess's, ratings and labels as given. */
 function puzzles(n: number, rating: (i: number) => number, labels: (i: number) => string[]) {
   return Array.from({ length: n }, (_, i) => ({
-    id: `z${String(i).padStart(5, "0")}`,
+    id: spreadId(i),
     fen: "8/8/8/8/8/8/8/8 w - - 0 1",
     moves: "e2e4 e7e5 g1f3",
     rating: rating(i),
@@ -49,16 +56,11 @@ describe("trainingSource", () => {
   });
 });
 
-describe("sliceOffsets", () => {
-  it("reads every slice of a small window", () => {
-    expect(sliceOffsets(0, Math.random)).toEqual([]);
-    expect(sliceOffsets(450, Math.random)).toEqual([0, 200, 400]);
-  });
-
-  it("reads three consecutive slices from a random start in a big window, wrapping round", () => {
-    expect(sliceOffsets(2000, () => 0)).toEqual([0, 200, 400]);
-    expect(sliceOffsets(2000, () => 0.95)).toEqual([1800, 0, 200]); // start at slice 9 of 10
-    expect(sliceOffsets(2000, () => 0.9999999)).toEqual([1800, 0, 200]);
+describe("randomId", () => {
+  it("is five letters or digits, spread by the random number", () => {
+    expect(randomId(() => 0)).toBe("00000");
+    expect(randomId(() => 0.9999999)).toBe("zzzzz");
+    expect(randomId(Math.random)).toMatch(/^[0-9A-Za-z]{5}$/);
   });
 });
 
@@ -125,7 +127,24 @@ describe("selectPuzzles", () => {
     const got = await selectPuzzles(db, { userId: USER, puzzleLabels: ["fork"], count: 10, random: seeded() });
     expect(got).toHaveLength(10);
     const reads = log.filter((q) => q.table === "puzzles" && !q.head);
-    expect(reads).toHaveLength(1); // one slice of 200 was enough
+    expect(reads.length).toBeLessThanOrEqual(2); // a slice of 200 (two if it started near the end), not all 5,000
+  });
+
+  it("reads a small window whole, going round from its random start", async () => {
+    const store = puzzles(150, () => 1500, () => ["pin"]);
+    for (const r of [() => 0, () => 0.5, () => 0.9999999]) {
+      const { db } = fakeDb({ puzzles: store, puzzle_attempts: [] });
+      const got = await selectPuzzles(db, { userId: USER, puzzleLabels: ["pin"], count: 150, random: r });
+      expect(got).toHaveLength(150);
+    }
+  });
+
+  it("starts from a different place each time, so sessions differ", async () => {
+    const store = puzzles(3000, () => 1500, () => ["fork"]);
+    const { db } = fakeDb({ puzzles: store, puzzle_attempts: [] });
+    const a = await selectPuzzles(db, { userId: USER, puzzleLabels: ["fork"], count: 5, random: seeded(1) });
+    const b = await selectPuzzles(db, { userId: USER, puzzleLabels: ["fork"], count: 5, random: seeded(99) });
+    expect(a.map((p) => p.id)).not.toEqual(b.map((p) => p.id));
   });
 
   it("returns nothing for no labels or a zero count, without reading the store", async () => {
@@ -142,6 +161,6 @@ describe("selectPuzzles", () => {
     ).rejects.toThrow("Could not read past attempts");
     await expect(
       selectPuzzles(fakeDb({ puzzles: store, puzzle_attempts: [] }, { failOn: "puzzles" }).db, { userId: USER, puzzleLabels: ["fork"], count: 5 }),
-    ).rejects.toThrow("Could not count puzzles");
+    ).rejects.toThrow("Could not read puzzles");
   });
 });

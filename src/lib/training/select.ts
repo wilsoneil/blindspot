@@ -114,7 +114,8 @@ export async function selectPuzzles(db: Pick<Db, "from">, o: SelectOptions): Pro
   const pool = new Map<string, PuzzleDbRow>();
   for (const w of RATING_WINDOWS) {
     type Filterable<Q> = {
-      gte: (c: string, v: number) => Q; lte: (c: string, v: number) => Q;
+      gte: (c: string, v: number | string) => Q; lte: (c: string, v: number) => Q;
+      gt: (c: string, v: string) => Q; lt: (c: string, v: string) => Q;
       contains: (c: string, v: string[]) => Q; overlaps: (c: string, v: string[]) => Q;
     };
     const inWindow = <Q extends Filterable<Q>>(q: Q) => {
@@ -124,21 +125,27 @@ export async function selectPuzzles(db: Pick<Db, "from">, o: SelectOptions): Pro
       return f;
     };
 
-    const { count, error } = await inWindow(
-      db.from("puzzles").select("id", { count: "exact", head: true }),
-    );
-    if (error) throw new Error(`Could not count puzzles: ${error.message}`);
-    const total = count ?? 0;
-
-    // Puzzle ids are random strings, so a slice in id order is a random sample.
-    const offsets = sliceOffsets(total, random);
-    for (const offset of offsets) {
-      const { data, error: readErr } = await inWindow(
-        db.from("puzzles").select("id, fen, moves, rating, themes, labels"),
-      ).order("id").range(offset, offset + SLICE - 1);
+    // Puzzle ids are random strings, so reading in id order from a random id is a random
+    // sample: from there to the end, then round from the beginning (no count needed).
+    const start = randomId(random);
+    let cursor: string | null = null;
+    let wrapped = false;
+    for (let i = 0; i < SLICES_PER_WINDOW; i++) {
+      let q = inWindow(db.from("puzzles").select("id, fen, moves, rating, themes, labels"));
+      if (cursor !== null) q = q.gt("id", cursor);
+      q = wrapped ? q.lt("id", start) : cursor === null ? q.gte("id", start) : q;
+      const { data, error: readErr } = await q.order("id").limit(SLICE);
       if (readErr) throw new Error(`Could not read puzzles: ${readErr.message}`);
-      for (const row of data as PuzzleDbRow[]) if (!skip.has(row.id)) pool.set(row.id, row);
+      const rows = data as PuzzleDbRow[];
+      for (const row of rows) if (!skip.has(row.id)) pool.set(row.id, row);
       if (pool.size >= o.count) break;
+      if (rows.length < SLICE) {
+        if (wrapped) break; // read the whole window
+        wrapped = true;
+        cursor = null;
+      } else {
+        cursor = rows[rows.length - 1].id;
+      }
     }
     if (pool.size >= o.count) break;
   }
@@ -148,16 +155,11 @@ export async function selectPuzzles(db: Pick<Db, "from">, o: SelectOptions): Pro
   }));
 }
 
-/**
- * Where to read in a window of `total` puzzles: every slice when there are few, otherwise
- * SLICES_PER_WINDOW consecutive slices from a random start (wrapping round to the beginning).
- */
-export function sliceOffsets(total: number, random: () => number): number[] {
-  if (total <= 0) return [];
-  const slices = Math.ceil(total / SLICE);
-  if (slices <= SLICES_PER_WINDOW) return Array.from({ length: slices }, (_, i) => i * SLICE);
-  const start = Math.min(slices - 1, Math.floor(random() * slices));
-  return Array.from({ length: SLICES_PER_WINDOW }, (_, i) => ((start + i) % slices) * SLICE);
+const ID_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+/** A random place among the puzzle ids (Lichess ids are five letters and digits). */
+export function randomId(random: () => number): string {
+  return Array.from({ length: 5 }, () => ID_CHARS[Math.floor(random() * ID_CHARS.length) % ID_CHARS.length]).join("");
 }
 
 function shuffle<T>(items: T[], random: () => number): T[] {
