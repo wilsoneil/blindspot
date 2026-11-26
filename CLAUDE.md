@@ -31,7 +31,7 @@ Update this section when a phase is finished.
 
 1. Blindspot rating headline on the home page, with a week / month / all-time chart (hand-drawn SVG, theme chart colours, no chart library): **done** (`src/app/trend-chart.tsx`, `src/lib/progress/series.ts`, `ratingHistory` in `src/lib/training/rating.ts`)
 2. Blitz gap: daily minus blitz rating, each a 30-day average, "600 and falling", chart, both ratings in small print: **done** (`src/lib/progress/blitz-gap.ts`; history from `games.user_rating` plus `rating_snapshots`)
-3. Theme ratings: a Glicko-2 rating per weakness label from first attempts at puzzles carrying it, on each row of the top-weaknesses list
+3. Theme ratings: a Glicko-2 rating per weakness from first attempts at puzzles carrying its labels, on each row of the top-weaknesses list: **done** (`src/lib/progress/theme-ratings.ts`; own-position weaknesses show the share solved; openings none yet)
 4. Weakness trend from games: migration 0007 (score history per profile and key), written by the daily rebuild; one-off backfill replaying the profile at past dates; shown per weakness
 5. Review; mark Phase 4 done
 

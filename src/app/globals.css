@@ -381,3 +381,6 @@ ol.weaknesses {
 .gap-trend { font-weight: 400; color: var(--muted); }
 .gap-trend.falling { color: var(--good); }
 .gap-trend.rising { color: var(--bad); }
+.theme-rating { color: var(--text); font-variant-numeric: tabular-nums; }
+.theme-up { color: var(--good); }
+.theme-down { color: var(--bad); }

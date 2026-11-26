@@ -6,6 +6,7 @@ import type { Db } from "@/lib/db";
 import { describeTimeControl, type Settings } from "@/lib/settings";
 import { blitzGap, SMOOTHING_DAYS, type RatingSample } from "@/lib/progress/blitz-gap";
 import { chartSeries } from "@/lib/progress/series";
+import { themeRating, type ThemeAttempt, type ThemeRating } from "@/lib/progress/theme-ratings";
 import { MIN_RD, ratingHistory } from "@/lib/training/rating";
 import { recentDrills } from "@/lib/training/stats";
 import {
@@ -48,13 +49,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   if (ctx.status !== "ready") return <SetupNotice ctx={ctx} />;
 
   const { settings } = ctx;
-  const [s, profiles, params, drills, history, gap] = await Promise.all([
+  const [s, profiles, params, drills, history, gap, themeAttempts] = await Promise.all([
     loadStatus(ctx.db, ctx.userId, settings),
     loadProfiles(ctx.db, ctx.userId),
     searchParams,
     recentDrills(ctx.db, ctx.userId),
     loadRating(ctx.db, ctx.userId),
     loadBlitzGap(ctx.db, ctx.userId),
+    loadThemeAttempts(ctx.db, ctx.userId),
   ]);
   profiles.sort((a, b) => b.gamesAnalysed - a.gamesAnalysed);
 
@@ -93,7 +95,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           </nav>
         )}
         {profile && profile.top.length > 0 ? (
-          <WeaknessList profile={profile} shown={settings.weaknessesShown} drills={drills} />
+          <WeaknessList profile={profile} shown={settings.weaknessesShown} drills={drills}
+            themes={themeRatings(profile.top.map((w) => w.key), themeAttempts)} />
         ) : (
           <p className="muted" style={{ marginBottom: 0 }}>
             {s.analysed === 0
@@ -235,5 +238,33 @@ function BlitzGapCard({ gap }: { gap: Awaited<ReturnType<typeof loadBlitzGap>> }
       </p>
     </section>
   );
+}
+
+/** Every first attempt, oldest first, for the rating per weakness theme. */
+async function loadThemeAttempts(db: Db, userId: string) {
+  const attempts: ThemeAttempt[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db.from("puzzle_attempts")
+      .select("labels, puzzle_rating, correct, solve_ms, target_ms, attempted_at")
+      .eq("user_id", userId).eq("first_attempt", true).order("id").range(from, from + PAGE - 1);
+    if (error) throw new Error(`Could not read attempts for theme ratings: ${error.message}`);
+    for (const a of data) {
+      attempts.push({
+        labels: a.labels, puzzleRating: a.puzzle_rating, fullySolved: a.correct && a.solve_ms <= a.target_ms,
+        at: new Date(a.attempted_at).getTime(),
+      });
+    }
+    if (data.length < PAGE) break;
+  }
+  return { attempts, now: Date.now() };
+}
+
+function themeRatings(keys: string[], t: Awaited<ReturnType<typeof loadThemeAttempts>>): Record<string, ThemeRating> {
+  const out: Record<string, ThemeRating> = {};
+  for (const k of keys) {
+    const r = themeRating(k, t.attempts, t.now);
+    if (r) out[k] = r;
+  }
+  return out;
 }
 
