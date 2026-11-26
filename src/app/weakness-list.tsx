@@ -3,14 +3,17 @@
 import Link from "next/link";
 import { describeKey } from "@/lib/analysis/profile";
 import { weaknessFromKey } from "@/lib/training/sources";
+import { MIN_THEME_ATTEMPTS, type ThemeRating } from "@/lib/progress/theme-ratings";
 import type { DrillStat } from "@/lib/training/stats";
 import type { StoredProfile } from "@/lib/weakness-store";
 
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
-export function WeaknessList({ profile, shown, drills = {} }: {
+export function WeaknessList({ profile, shown, drills = {}, themes = {} }: {
   profile: StoredProfile; shown: number; drills?: Record<string, DrillStat>;
+  /** Rating (or share solved) per weakness, from puzzles: the leading indicator. */
+  themes?: Record<string, ThemeRating>;
 }) {
   const top = profile.top.slice(0, shown);
   return (
@@ -38,6 +41,7 @@ export function WeaknessList({ profile, shown, drills = {} }: {
             <div className="small muted">
               {w.mistakes} mistake{w.mistakes === 1 ? "" : "s"} in {w.games} game{w.games === 1 ? "" : "s"}
             </div>
+            {themes[w.key] && <ThemeLine r={themes[w.key]} />}
             {drills[w.key] && (
               <div className="small weakness-training">
                 ▶ {drills[w.key].attempted} puzzle{drills[w.key].attempted === 1 ? "" : "s"} drilled this week
@@ -67,3 +71,31 @@ export function WeaknessList({ profile, shown, drills = {} }: {
     </>
   );
 }
+
+/** "Puzzle rating 1640 (+35 in 30 days)", or the share solved for own-game positions. */
+function ThemeLine({ r }: { r: ThemeRating }) {
+  if (r.kind === "own") {
+    return (
+      <div className="small muted">
+        Own positions: {Math.round((100 * r.solved) / r.attempts)}% of {r.attempts} solved in time
+      </div>
+    );
+  }
+  if (r.kind === "few") {
+    return (
+      <div className="small muted">
+        Puzzle rating after {MIN_THEME_ATTEMPTS} puzzles ({r.attempts} so far)
+      </div>
+    );
+  }
+  return (
+    <div className="small muted">
+      Puzzle rating <strong className="theme-rating">{r.rating}</strong>
+      {r.change !== null && Math.round(r.change) !== 0 && (
+        <span className={r.change > 0 ? "theme-up" : "theme-down"}> {r.change > 0 ? "+" : "−"}{Math.abs(r.change)} in 30 days</span>
+      )}
+      {" "}· {r.attempts} puzzles
+    </div>
+  );
+}
+
