@@ -157,16 +157,22 @@ export function AnalysisBoard({ fen, line: puzzleLine, orientation, engineDefaul
       </div>
       {gameMove && (
         <p className="small" style={{ margin: "0.5rem 0 0" }}>
-          <span className="game-move-key" aria-hidden="true">→</span> In the game you played <strong>{gameMove.san}</strong>.{" "}
+          <span className="game-move-key" aria-hidden="true">→</span> In the game you played{" "}
           {onGameLine ? (
             <>
+              <strong>{gameMove.san}</strong>.{" "}
               <span className="muted">Step forward to see the opponent&rsquo;s best reply. </span>
               <button type="button" className="link-button" onClick={() => { setLine(puzzleLine); setPly(startPly); }}>Back to the position</button>
             </>
           ) : (
-            <button type="button" className="link-button" onClick={() => { setLine(gameLine!); setPly(1); }}>
-              What happened in the game
-            </button>
+            <>
+              {/* The move itself plays the game line (its own sentence was redundant). */}
+              <button type="button" className="link-button" style={{ fontWeight: 700 }}
+                aria-label={`${gameMove.san}: show what happened in the game`}
+                onClick={() => { setLine(gameLine!); setPly(1); }}>
+                {gameMove.san}
+              </button>.
+            </>
           )}
         </p>
       )}
