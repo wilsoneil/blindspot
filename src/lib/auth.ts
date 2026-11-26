@@ -52,12 +52,27 @@ export async function createAuthClient() {
   });
 }
 
-/** The signed-in, allowed user, or null. Checks the session with Supabase, not just the cookie. */
+/**
+ * The verified login behind a Supabase client's session cookie, or null.
+ * getClaims() checks the token's signature: on our own server when the project uses
+ * asymmetric signing keys (no network round trip), otherwise by asking Supabase Auth.
+ * Either way a forged or expired cookie is rejected (an expired one is refreshed first).
+ */
+export async function verifiedLogin(
+  supabase: { auth: { getClaims: () => Promise<{ data: { claims: Record<string, unknown> } | null; error: unknown }> } },
+  allowed: Set<string>,
+): Promise<SignedInUser | null> {
+  const { data, error } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  const email = typeof claims?.email === "string" ? claims.email : undefined;
+  if (error || typeof claims?.sub !== "string" || !email || !isAllowed(email, allowed)) return null;
+  return { authUserId: claims.sub, email };
+}
+
+/** The signed-in, allowed user, or null. Verifies the session token, not just that a cookie exists. */
 export async function getSignedInUser(): Promise<SignedInUser | null> {
   const env = authEnv();
   const supabase = await createAuthClient();
   if (!env || !supabase) return null;
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user || !isAllowed(data.user.email, env.allowed)) return null;
-  return { authUserId: data.user.id, email: data.user.email! };
+  return verifiedLogin(supabase, env.allowed);
 }

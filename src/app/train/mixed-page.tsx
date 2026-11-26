@@ -32,7 +32,11 @@ export async function MixedModePage({ mode, tc }: { mode: "rush" | "survival"; t
   if (ctx.status !== "ready") return <SetupNotice ctx={ctx} />;
 
   const profileKey = tc?.slice(0, 40) ?? profileKeyForSetting(ctx.settings.focusTimeControl);
-  const profile = (await loadProfiles(ctx.db, ctx.userId)).find((p) => p.profileKey === profileKey);
+  // Read together: they don't depend on each other.
+  const [profiles, level, stats] = await Promise.all([
+    loadProfiles(ctx.db, ctx.userId), puzzleLevel(ctx.db, ctx.userId), runStats(ctx.db, ctx.userId, mode),
+  ]);
+  const profile = profiles.find((p) => p.profileKey === profileKey);
   const weaknesses = shuffled(mixedWeaknesses(profile?.top ?? [], ctx.settings.weaknessesShown));
   const title = mode === "rush" ? "Rush" : "Survival";
   const back = <p className="small" style={{ marginBottom: 0 }}><Link href="/">Back to your weaknesses</Link></p>;
@@ -47,11 +51,7 @@ export async function MixedModePage({ mode, tc }: { mode: "rush" | "survival"; t
     );
   }
 
-  const level = await puzzleLevel(ctx.db, ctx.userId);
-  const [puzzles, stats] = await Promise.all([
-    selectRunPuzzles(ctx.db, { userId: ctx.userId, weaknesses, level, fromChunk: 0, chunks: 2 }),
-    runStats(ctx.db, ctx.userId, mode),
-  ]);
+  const puzzles = await selectRunPuzzles(ctx.db, { userId: ctx.userId, weaknesses, level, fromChunk: 0, chunks: 2 });
   return (
     <section className="card">
       <h1>{title} <span className="pill">{describeProfileKey(profileKey)}</span></h1>

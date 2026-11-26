@@ -6,7 +6,7 @@ import { describeTimeControl } from "@/lib/settings";
 import { blitzGap, SMOOTHING_DAYS, type RatingSample } from "@/lib/progress/blitz-gap";
 import { chartSeries } from "@/lib/progress/series";
 import { themeRating, type ThemeAttempt, type ThemeRating } from "@/lib/progress/theme-ratings";
-import { MIN_RD, ratingHistory } from "@/lib/training/rating";
+import { MIN_RD, replay } from "@/lib/training/rating";
 import { loadStatus } from "@/lib/data-status";
 import {
   describeProfileKey, loadProfiles, loadWeaknessTrends, profileKeyForSetting,
@@ -21,13 +21,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   if (ctx.status !== "ready") return <SetupNotice ctx={ctx} />;
 
   const { settings } = ctx;
-  const [s, profiles, params, history, gap, themeAttempts] = await Promise.all([
+  const [s, profiles, params, attempts, gap] = await Promise.all([
     loadStatus(ctx.db, ctx.userId, settings),
     loadProfiles(ctx.db, ctx.userId),
     searchParams,
-    loadRating(ctx.db, ctx.userId),
+    loadAttempts(ctx.db, ctx.userId),
     loadBlitzGap(ctx.db, ctx.userId),
-    loadThemeAttempts(ctx.db, ctx.userId),
   ]);
   profiles.sort((a, b) => b.gamesAnalysed - a.gamesAnalysed);
 
@@ -42,7 +41,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
 
   return (
     <>
-      <RatingCard rating={history} />
+      <RatingCard rating={ratingFrom(attempts)} />
 
       {!settings.chesscomUsername && (
         <section className="card notice">
@@ -69,7 +68,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         )}
         {profile && profile.top.length > 0 ? (
           <WeaknessList profile={profile} shown={settings.weaknessesShown}
-            themes={themeRatings(profile.top.map((w) => w.key), themeAttempts)} trends={trends} />
+            themes={themeRatings(profile.top.map((w) => w.key), attempts)} trends={trends} />
         ) : (
           <p className="muted" style={{ marginBottom: 0 }}>
             {s.analysed === 0
@@ -98,16 +97,16 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   );
 }
 
-/** The Blindspot rating with its chart series (SPEC.md -> "Progress and headline metrics"). */
-async function loadRating(db: Db, userId: string) {
-  const history = await ratingHistory(db, userId);
-  const last = history.at(-1)?.rating;
-  const points = history.map((h) => ({ t: new Date(h.at).getTime(), v: Math.round(h.rating.rating) }));
-  return { last, count: history.length, series: chartSeries(points, Date.now()) };
+/** The Blindspot rating and its chart series, replayed from the rated first attempts (Lichess puzzles only). */
+function ratingFrom({ attempts, now }: Awaited<ReturnType<typeof loadAttempts>>) {
+  const rated = attempts.filter((a) => a.puzzleRating !== null);
+  const history = replay(rated.map((a) => ({ puzzleRating: a.puzzleRating!, fullySolved: a.fullySolved })));
+  const points = history.map((h, i) => ({ t: rated[i].at, v: Math.round(h.rating) }));
+  return { last: history.at(-1), count: history.length, series: chartSeries(points, now) };
 }
 
 /** The home page's headline number. */
-function RatingCard({ rating }: { rating: Awaited<ReturnType<typeof loadRating>> }) {
+function RatingCard({ rating }: { rating: ReturnType<typeof ratingFrom> }) {
   const { last, count, series } = rating;
   if (!last) {
     return (
@@ -179,8 +178,11 @@ function BlitzGapCard({ gap }: { gap: Awaited<ReturnType<typeof loadBlitzGap>> }
   );
 }
 
-/** Every first attempt, oldest first, for the rating per weakness theme. */
-async function loadThemeAttempts(db: Db, userId: string) {
+/**
+ * Every first attempt, oldest first, read once for both the Blindspot rating (Lichess puzzles)
+ * and the rating per weakness theme (which also counts own-game positions).
+ */
+async function loadAttempts(db: Db, userId: string) {
   const attempts: ThemeAttempt[] = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await db.from("puzzle_attempts")
@@ -198,7 +200,7 @@ async function loadThemeAttempts(db: Db, userId: string) {
   return { attempts, now: Date.now() };
 }
 
-function themeRatings(keys: string[], t: Awaited<ReturnType<typeof loadThemeAttempts>>): Record<string, ThemeRating> {
+function themeRatings(keys: string[], t: Awaited<ReturnType<typeof loadAttempts>>): Record<string, ThemeRating> {
   const out: Record<string, ThemeRating> = {};
   for (const k of keys) {
     const r = themeRating(k, t.attempts, t.now);

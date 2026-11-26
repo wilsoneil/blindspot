@@ -17,3 +17,23 @@ describe("allowlist", () => {
     expect(isAllowed(undefined, list)).toBe(false);
   });
 });
+
+describe("verifiedLogin", () => {
+  const client = (data: { claims: Record<string, unknown> } | null, error: unknown = null) =>
+    ({ auth: { getClaims: async () => ({ data, error }) } });
+  const allowed = new Set(["me@example.com"]);
+
+  it("accepts a verified, allowed login", async () => {
+    const { verifiedLogin } = await import("../src/lib/auth");
+    expect(await verifiedLogin(client({ claims: { sub: "u-1", email: "Me@Example.com" } }), allowed))
+      .toEqual({ authUserId: "u-1", email: "Me@Example.com" });
+  });
+
+  it("rejects no session, a failed check, a missing email and an email not on the list", async () => {
+    const { verifiedLogin } = await import("../src/lib/auth");
+    expect(await verifiedLogin(client(null), allowed)).toBeNull();
+    expect(await verifiedLogin(client({ claims: { sub: "u-1", email: "me@example.com" } }, new Error("bad signature")), allowed)).toBeNull();
+    expect(await verifiedLogin(client({ claims: { sub: "u-1" } }), allowed)).toBeNull();
+    expect(await verifiedLogin(client({ claims: { sub: "u-1", email: "someone@else.com" } }), allowed)).toBeNull();
+  });
+});

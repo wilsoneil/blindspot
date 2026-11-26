@@ -81,11 +81,13 @@ export interface RunSelect {
 /** The next chunks of a run, in ladder order (easiest first within each chunk). */
 export async function selectRunPuzzles(db: Pick<Db, "from">, o: RunSelect): Promise<RunPuzzle[]> {
   if (o.weaknesses.length === 0) return [];
-  const attempted = await attemptedPuzzleIds(db, o.userId);
   const taken = new Set(o.exclude ?? []);
   // Every due review, so ones that fit this part of the ladder are found even behind a
-  // backlog of harder ones the run hasn't reached.
-  const reviews = await loadDueReviews(db, o.userId, { limit: MAX_DUE_REVIEWS, level: o.level, exclude: taken, now: o.now });
+  // backlog of harder ones the run hasn't reached. Read alongside the past attempts.
+  const [attempted, reviews] = await Promise.all([
+    attemptedPuzzleIds(db, o.userId),
+    loadDueReviews(db, o.userId, { limit: MAX_DUE_REVIEWS, level: o.level, exclude: taken, now: o.now }),
+  ]);
   const byChunk = placeReviews(reviews, o.level, o.fromChunk, o.chunks);
   const out: RunPuzzle[] = [];
   for (let c = o.fromChunk; c < o.fromChunk + o.chunks; c++) {
