@@ -56,15 +56,13 @@ export function WeaknessList({ profile, shown, themes = {}, trends = {} }: {
           Only {top.length} {top.length === 1 ? "area has" : "areas have"} enough evidence so far (mistakes in at least three games).
         </p>
       )}
-      <p className="small muted" style={{ marginBottom: 0 }}>
-        Updated {formatDate(profile.computedAt)}
-      </p>
       <details className="how-to-read small muted">
         <summary>How to read this</summary>
         <ul>
           <li>
             <strong>The number and bar:</strong> how weak each area is compared with the rest of your game; 100 is your
-            weakest. From {profile.gamesAnalysed.toLocaleString()} analysed games and {profile.mistakes.toLocaleString()} mistakes.
+            weakest. From {profile.gamesAnalysed.toLocaleString()} analysed games and {profile.mistakes.toLocaleString()} mistakes,
+            updated {formatDate(profile.computedAt)}.
           </li>
           <li>
             <strong>Puzzles:</strong> your rating on puzzles with this theme (from {MIN_THEME_ATTEMPTS} puzzles), and its change

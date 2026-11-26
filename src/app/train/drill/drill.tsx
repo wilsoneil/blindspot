@@ -37,6 +37,9 @@ export function Drill({ weaknessKey, profileKey, initial, engineDefault }: {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [analysing, setAnalysing] = useState(false);
+  // Once the analysis has been opened the answer is known: no "Try again" for that puzzle.
+  // A missed puzzle still comes back later through the review queue.
+  const [analysed, setAnalysed] = useState(false);
   const sessionId = useRef<number | null>(null);
   const seen = useRef(new Set(initial.map((p) => p.id)));
   const puzzle = queue[index];
@@ -66,6 +69,7 @@ export function Drill({ weaknessKey, profileKey, initial, engineDefault }: {
 
   function reset() {
     setAnalysing(false);
+    setAnalysed(false);
     setOutcome(null);
     setResult(null);
     setMessage(null);
@@ -113,8 +117,10 @@ export function Drill({ weaknessKey, profileKey, initial, engineDefault }: {
       {result && (
         <div className="save-bar" style={{ marginTop: "0.75rem", flexWrap: "wrap" }}>
           <button type="button" className="button" onClick={next}>Next puzzle</button>
-          <button type="button" className="link-button" onClick={() => { reset(); setRound((n) => n + 1); }}>Try again</button>
-          <button type="button" className="link-button" onClick={() => setAnalysing((a) => !a)}>
+          {!analysed && (
+            <button type="button" className="link-button" onClick={() => { reset(); setRound((n) => n + 1); }}>Try again</button>
+          )}
+          <button type="button" className="link-button" onClick={() => { setAnalysed(true); setAnalysing((a) => !a); }}>
             {analysing ? "Close analysis" : "Analyse"}
           </button>
           <span className="small muted">
