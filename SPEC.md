@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 26 Nov 2026 (Blitz gap: no "and falling" text)
+Last updated: 26 Nov 2026 (Vercel functions in London, next to the database)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -202,6 +202,7 @@ GitHub repo ──(deploys on every change)──> Vercel (web app + server func
 ```
 
 - **Stack:** Next.js web app on Vercel; chessground board and chess.js rules; Stockfish (native in the job, WebAssembly in the browser); Supabase Postgres database
+- **Regions:** the Supabase database is in London (eu-west-2), so Vercel's server functions run in London too (`"regions": ["lhr1"]` in `vercel.json`). Each page makes several database calls; keeping both in the same city keeps each one short.
 - **Costs:** GitHub Actions is free and unlimited on a public repo, or 2,000 minutes a month on a private one. The 12-month backlog fits within one month. Vercel (Hobby, personal non-commercial) and Supabase free tiers cover one user. Supabase free projects pause after a week without database activity; the daily job keeps it active.
 - **Secrets:** the only API key is for the AI explanations (chess.com and Lichess are open); it sits in a Vercel server function with a spending cap. The database credentials and any future key live in Vercel and GitHub settings, never in code or chat. `.env` is ignored by Git from the first commit, and secret scanning is on.
 - **Personal game data:** chess.com game records contain the user's and opponents' usernames, so imported games, analysis results and ratings are stored only in Supabase. They are never committed to the repo: no real games in test fixtures, sample data, logs or exported files. Tests use made-up or anonymised games.
