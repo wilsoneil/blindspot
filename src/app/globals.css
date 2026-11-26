@@ -353,30 +353,30 @@ ol.weaknesses {
 .check-table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); }
 .check-table th { color: var(--muted); font-weight: 600; white-space: nowrap; }
 
-/* Headline numbers on the home page, with their charts (src/app/trend-chart.tsx). */
-.headline-label { color: var(--muted); font-size: 0.875rem; }
-.headline-value { font-size: 2.4rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.trend { margin-top: 0.5rem; }
-.trend-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-.trend .good { color: var(--good); }
-.trend .bad { color: var(--bad); }
-.trend-tabs { display: inline-flex; gap: 0.25rem; }
-.trend-tab {
+/* Headline cards on the home page (src/app/trend-chart.tsx): number left, small chart right. */
+.headline-label { color: var(--muted); font-size: 0.8rem; }
+.card.compact-card { padding: 0.65rem 0.9rem; }
+.compact-main { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.compact-left { min-width: 0; }
+.compact-value { font-size: 1.6rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.compact-left .good { color: var(--good); }
+.compact-left .bad { color: var(--bad); }
+.compact-right { flex: 0 1 45%; max-width: 180px; display: flex; flex-direction: column; align-items: flex-end; gap: 0.15rem; }
+.mini-chart { display: block; width: 100%; height: 44px; }
+.mini-empty { display: flex; align-items: center; justify-content: flex-end; }
+.mini-tabs { display: inline-flex; gap: 0.15rem; }
+.mini-tab {
   font: inherit;
-  font-size: 0.8rem;
-  padding: 0.15rem 0.55rem;
+  font-size: 0.7rem;
+  padding: 0 0.4rem;
   border-radius: 999px;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
 }
-.trend-tab.active { background: var(--surface-alt); color: var(--text); border-color: var(--surface-alt); }
-.trend-chart { display: block; width: 100%; height: auto; margin-top: 0.35rem; }
-.trend-grid { stroke: var(--border); stroke-width: 1; }
-.trend-axis { fill: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
-.trend-empty { margin: 0.5rem 0 0; }
-.gap-value { font-size: 1.6rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.mini-tab.active { background: var(--surface-alt); color: var(--text); }
+.compact-footnote { margin-top: 0.3rem; color: var(--muted); font-size: 0.75rem; }
 .gap-trend { font-weight: 400; color: var(--muted); }
 .gap-trend.falling { color: var(--good); }
 .gap-trend.rising { color: var(--bad); }
