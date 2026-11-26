@@ -71,6 +71,9 @@ export function WeaknessList({ profile, shown, drills = {}, themes = {}, trends 
         From {profile.gamesAnalysed.toLocaleString()} analysed games and {profile.mistakes.toLocaleString()} mistakes;
         updated {formatDate(profile.computedAt)}. Severity is relative: 100 is your weakest area.
         Tap Drill to train one. Weaknesses Lichess puzzles can&rsquo;t train use positions from your own games.
+        &ldquo;Loses you&rdquo; is the winning chance these mistakes throw away in your games, averaged per game
+        (recent games count more). It comes from games only, so it falls as training carries over. A mistake with
+        several labels counts for each, so the figures don&rsquo;t add up to a total.
       </p>
     </>
   );
@@ -105,13 +108,13 @@ function ThemeLine({ r }: { r: ThemeRating }) {
 
 const pct = (x: number) => `${(100 * x).toFixed(1)}%`;
 
-/** "In games: costs 3.1% a game, down from 4.2% a month ago", with a sparkline. */
+/** "Loses you 3.1% winning chance per game, down from 4.2% a month ago", with a sparkline. */
 function TrendLine({ t }: { t: Trend }) {
   return (
     <div className="small muted">
       <Sparkline points={t.points.map((p) => p.v)} />
       <span>
-        In games: costs {pct(t.now)} a game
+        Loses you {pct(t.now)} winning chance per game
         {t.direction === "falling" && <span className="theme-up">, down from {pct(t.then!)} a month ago</span>}
         {t.direction === "rising" && <span className="theme-down">, up from {pct(t.then!)} a month ago</span>}
         {t.direction === "steady" && <>, steady over the month</>}
