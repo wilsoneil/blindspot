@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildProfile, describeKey, MIN_GAMES, type ProfileGame, type ProfileMistake } from "../src/lib/analysis/profile";
+import {
+  buildProfile, describeKey, MIN_GAMES, PAIR_MIN_OWN_POSITIONS, type ProfileGame, type ProfileMistake,
+} from "../src/lib/analysis/profile";
 
 const NOW = new Date("2026-11-01T12:00:00Z");
 const daysAgo = (d: number) => new Date(NOW.getTime() - d * 86_400_000).toISOString();
@@ -118,6 +120,32 @@ describe("pairs", () => {
     const p = await buildProfile(g, m, { ...opts, countPuzzles: async () => 150 });
     expect(p.top.some((e) => e.labels.length === 2)).toBe(false);
     expect(p.top.map((e) => e.key)).toEqual(expect.arrayContaining(["fork:allowed", "phaseEndgame"]));
+  });
+
+  it(`need only ${PAIR_MIN_OWN_POSITIONS} own positions when trained from the user's games`, async () => {
+    // Pawn decisions go wrong in the endgame: a positional pair, trained with own positions.
+    const withMistakes = (n: number) => [
+      ...Array.from({ length: n }, (_, i) => mistake(i + 1, ["pawnDecisions"], 0.4, "phaseEndgame")),
+      ...Array.from({ length: 40 }, (_, i) => mistake(i + 1, ["pin:allowed"], 0.3, "phaseMiddlegame")),
+    ];
+    const pairOf = async (n: number) =>
+      (await buildProfile(games(60, ["phaseEndgame"]), withMistakes(n), { ...opts, review: true, countPuzzles: async () => 0 }))
+        .review!.pairs.find((x) => x.key === "pawnDecisions+phaseEndgame")!;
+    expect(await pairOf(PAIR_MIN_OWN_POSITIONS)).toMatchObject({ positional: true, positions: PAIR_MIN_OWN_POSITIONS, outcome: "shown" });
+    expect(await pairOf(PAIR_MIN_OWN_POSITIONS - 1)).toMatchObject({ outcome: "fewPositions" });
+  });
+
+  it("count own positions when the puzzles fall short and a label is also trained from own games", async () => {
+    // "Defending" also has Lichess equality puzzles, but none is a long mate as well.
+    const m2 = [
+      ...Array.from({ length: 30 }, (_, i) => mistake(i + 1, ["longMate:allowed", "defending"], 0.5)),
+      ...Array.from({ length: 40 }, (_, i) => mistake(i + 1, ["pin:allowed", "balanced"], 0.3)),
+    ];
+    const r = (await buildProfile(games(60, ["defending"]), m2, { ...opts, review: true, countPuzzles: async () => 0 })).review!;
+    expect(r.pairs.find((x) => x.key === "defending+longMate:allowed")).toMatchObject({ positional: true, positions: 30 });
+    // Without a label from own games, too few puzzles still means too few.
+    const fork = (await buildProfile(g, m, { ...opts, review: true, countPuzzles: async () => 0 })).review!;
+    expect(fork.pairs.find((x) => x.key === "fork:allowed+phaseEndgame")).toMatchObject({ positional: false, outcome: "fewPositions" });
   });
 
   it("need at least 8 distinct games", async () => {
