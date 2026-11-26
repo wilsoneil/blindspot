@@ -2,6 +2,7 @@
 // Server-only: used by the daily analysis job and by the settings page.
 
 import { buildProfile, type Profile, type ProfileGame, type ProfileMistake } from "./analysis/profile";
+import { backfillDates, historyEntries, trendOf, type Trend } from "./progress/weakness-trend";
 import { puzzleScores, type PuzzleAttemptForScore } from "./analysis/puzzle-scores";
 import type { Db } from "./db";
 import { describeTimeControl, type Settings } from "./settings";
@@ -139,17 +140,29 @@ async function loadProfileInputs(db: Db, userId: string, settings: Settings, now
       halfLifeDays: settings.halfLifeDays, gamesWeightPct: settings.gamesWeightPct, now, countPuzzles,
       puzzleScores: fromPuzzles, review,
     });
-  return { byKey, build };
+  /** From games only (no puzzle results), as it stood at `at`: for the weakness history. */
+  const buildFromGames = (data: { games: ProfileGame[]; mistakes: ProfileMistake[] }, at: Date) =>
+    buildProfile(
+      data.games.filter((g) => new Date(g.playedAt) <= at),
+      data.mistakes.filter((m) => new Date(m.playedAt) <= at),
+      { halfLifeDays: settings.halfLifeDays, gamesWeightPct: 100, now: at, countPuzzles },
+    );
+  return { byKey, build, buildFromGames };
 }
 
 /** Rebuilds every profile for a user from the stored analysis and puzzle results. Returns the profile keys written. */
-export async function rebuildProfiles(db: Db, userId: string, settings: Settings, now = new Date()): Promise<string[]> {
-  const { byKey, build } = await loadProfileInputs(db, userId, settings, now);
+export async function rebuildProfiles(
+  db: Db, userId: string, settings: Settings, now = new Date(),
+  /** Also save today's point of each weakness's history (the daily job; the first run fills in the past). */
+  o: { history?: boolean } = {},
+): Promise<string[]> {
+  const { byKey, build, buildFromGames } = await loadProfileInputs(db, userId, settings, now);
   const written: string[] = [];
   for (const [key, data] of byKey) {
     const profile = await build(data);
     await saveProfile(db, userId, key, profile, now);
     written.push(key);
+    if (o.history) await saveHistory(db, userId, key, data, buildFromGames, now);
   }
 
   // Remove profiles that no longer have any games (e.g. after shortening the history window).
@@ -173,6 +186,72 @@ export async function reviewProfile(
   const { byKey, build } = await loadProfileInputs(db, userId, settings, now);
   const data = byKey.get(profileKey);
   return data ? build(data, true) : null;
+}
+
+const isMissingHistoryTable = (message: string) => /weakness_history/.test(message);
+
+/**
+ * Today's history point for each weakness, and, the first time (no rows yet), one a week back
+ * to four weeks after the first game. Skipped with a note if migration 0007 isn't applied yet.
+ */
+async function saveHistory(
+  db: Db, userId: string, profileKey: string, data: { games: ProfileGame[]; mistakes: ProfileMistake[] },
+  buildFromGames: (data: { games: ProfileGame[]; mistakes: ProfileMistake[] }, at: Date) => Promise<Profile>, now: Date,
+) {
+  const { count, error } = await db.from("weakness_history").select("key", { count: "exact", head: true })
+    .eq("user_id", userId).eq("profile_key", profileKey);
+  if (error) {
+    if (isMissingHistoryTable(error.message)) {
+      console.log("Weakness history skipped: apply migration 0007 to keep it.");
+      return;
+    }
+    throw new Error(`Could not read the weakness history: ${error.message}`);
+  }
+  const firstGame = Math.min(...data.games.map((g) => new Date(g.playedAt).getTime()));
+  const dates = [...(count ? [] : backfillDates(firstGame, now.getTime()).map((t) => new Date(t))), now];
+  if (!count && dates.length > 1) console.log(`  ${profileKey}: filling in ${dates.length - 1} weeks of weakness history`);
+
+  let rows: Record<string, unknown>[] = [];
+  const flush = async () => {
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error: e } = await db.from("weakness_history").upsert(rows.slice(i, i + 500));
+      if (e) throw new Error(`Could not save the weakness history: ${e.message}`);
+    }
+    rows = [];
+  };
+  for (const at of dates) {
+    const p = await buildFromGames(data, at);
+    const takenOn = at.toISOString().slice(0, 10);
+    for (const e of historyEntries(p)) {
+      rows.push({
+        user_id: userId, profile_key: profileKey, taken_on: takenOn, key: e.key,
+        per_game: e.perGame, score: e.score, mistakes: e.mistakes, games: e.games,
+      });
+    }
+    if (rows.length >= 2000) await flush();
+  }
+  await flush();
+}
+
+/** Each weakness's trend in games over the last 120 days, for the home page. Empty before migration 0007. */
+export async function loadWeaknessTrends(
+  db: Db, userId: string, profileKey: string, keys: string[], now = new Date(),
+): Promise<Record<string, Trend>> {
+  if (!keys.length) return {};
+  const since = new Date(now.getTime() - 120 * 86_400_000).toISOString().slice(0, 10);
+  const rows = await readAll<{ key: string; taken_on: string; per_game: number }>((from, to) =>
+    db.from("weakness_history").select("key, taken_on, per_game")
+      .eq("user_id", userId).eq("profile_key", profileKey).in("key", keys).gte("taken_on", since)
+      .order("taken_on").range(from, to)).catch((e: Error) => {
+    if (isMissingHistoryTable(e.message)) return [];
+    throw e;
+  });
+  const out: Record<string, Trend> = {};
+  for (const k of keys) {
+    const t = trendOf(rows.filter((r) => r.key === k).map((r) => ({ t: new Date(`${r.taken_on}T00:00:00Z`).getTime(), perGame: r.per_game })), now.getTime());
+    if (t) out[k] = t;
+  }
+  return out;
 }
 
 async function saveProfile(db: Db, userId: string, key: string, p: Profile, now: Date) {

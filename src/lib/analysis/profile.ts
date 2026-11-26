@@ -75,6 +75,11 @@ export interface WeaknessEntry {
   /** Mistakes and distinct games behind it (not weighted). */
   mistakes: number;
   games: number;
+  /**
+   * Share of winning chance it costs per game (0-1), recency-weighted, from games only: an
+   * absolute measure, so its history can show improvement (the score is relative).
+   */
+  perGame: number;
 }
 
 export interface Profile {
@@ -294,6 +299,7 @@ export async function buildProfile(games: ProfileGame[], mistakes: ProfileMistak
     .sort((a, b) => scoreOf.get(b[0])! - scoreOf.get(a[0])! || a[0].localeCompare(b[0]));
   const entry = (key: string, labels: string[], s: Stats, score: number): WeaknessEntry => ({
     key, labels, name: describeKey(key), severity: 0, score, mistakes: s.mistakes, games: s.games.size,
+    perGame: allGames > 0 ? s.cost / allGames : 0,
   });
   const all = eligible.map(([k, s]) => entry(k, [k], s, scoreOf.get(k)!));
 
@@ -353,6 +359,7 @@ export async function buildProfile(games: ProfileGame[], mistakes: ProfileMistak
   for (const e of new Set([...all, ...top])) {
     e.severity = hi > lo ? Math.round((100 * (e.score - lo)) / (hi - lo)) : 100;
     e.score = Math.round(e.score * 1000) / 1000;
+    e.perGame = Math.round(e.perGame * 1e5) / 1e5;
   }
 
   const profile: Profile = { top, all, gamesAnalysed: games.length, mistakes: counted };
