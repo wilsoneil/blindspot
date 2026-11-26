@@ -9,6 +9,7 @@
 
 import { fetchArchive, fetchArchiveList, fetchRatings, planArchives, toGameRow } from "../src/lib/chesscom";
 import { requireDb } from "../src/lib/db";
+import { saveBlitzGap } from "../src/lib/progress/blitz-gap-store";
 
 try { process.loadEnvFile(".env.local"); } catch { /* no local file: use the real environment */ }
 
@@ -74,6 +75,8 @@ async function main() {
       if (rErr) throw new Error(rErr.message);
     }
     console.log(`${label}: ratings saved for ${snapshot.length} time controls`);
+    await saveBlitzGap(db, u.user_id);
+    console.log(`${label}: Blitz gap worked out`);
   }
 }
 

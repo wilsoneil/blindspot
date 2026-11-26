@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { getAppContext } from "@/lib/app-data";
 import type { Db } from "@/lib/db";
 import { describeTimeControl } from "@/lib/settings";
-import { blitzGap, SMOOTHING_DAYS, type RatingSample } from "@/lib/progress/blitz-gap";
+import { SMOOTHING_DAYS } from "@/lib/progress/blitz-gap";
+import { loadBlitzGap } from "@/lib/progress/blitz-gap-store";
 import { chartSeries } from "@/lib/progress/series";
 import { themeRating, type ThemeAttempt, type ThemeRating } from "@/lib/progress/theme-ratings";
 import { MIN_RD, replay } from "@/lib/training/rating";
@@ -26,7 +27,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
     loadProfiles(ctx.db, ctx.userId),
     searchParams,
     loadAttempts(ctx.db, ctx.userId),
-    loadBlitzGap(ctx.db, ctx.userId),
+    loadGap(ctx.db, ctx.userId),
   ]);
   profiles.sort((a, b) => b.gamesAnalysed - a.gamesAnalysed);
 
@@ -132,31 +133,14 @@ function RatingCard({ rating }: { rating: ReturnType<typeof ratingFrom> }) {
 
 const PAGE = 1000;
 
-/** Blitz and daily ratings from every imported game and the daily snapshots, smoothed into the gap. */
-async function loadBlitzGap(db: Db, userId: string) {
-  const samples: RatingSample[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await db.from("games").select("played_at, time_class, user_rating")
-      .eq("user_id", userId).in("time_class", ["blitz", "daily"]).not("user_rating", "is", null)
-      .order("id").range(from, from + PAGE - 1);
-    if (error) throw new Error(`Could not read game ratings: ${error.message}`);
-    for (const g of data) samples.push({ timeClass: g.time_class, t: new Date(g.played_at).getTime(), rating: g.user_rating });
-    if (data.length < PAGE) break;
-  }
-  const { data: snaps, error } = await db.from("rating_snapshots").select("taken_on, time_class, rating")
-    .eq("user_id", userId).in("time_class", ["blitz", "daily"]);
-  if (error) throw new Error(`Could not read rating snapshots: ${error.message}`);
-  // A snapshot is the rating when the day's import ran: put it at the start of that day,
-  // so games played later the same day come after it.
-  for (const r of snaps) samples.push({ timeClass: r.time_class, t: new Date(`${r.taken_on}T00:00:00Z`).getTime(), rating: r.rating });
-
-  const now = Date.now();
-  const gap = blitzGap(samples, now);
-  return gap && { ...gap, chart: chartSeries(gap.series, now) };
+/** The Blitz gap (stored daily by the import job) with its chart series. */
+async function loadGap(db: Db, userId: string) {
+  const gap = await loadBlitzGap(db, userId);
+  return gap && { ...gap, chart: chartSeries(gap.series, Date.now()) };
 }
 
 /** The Blitz gap, below the top weaknesses (SPEC.md -> "Progress and headline metrics"). */
-function BlitzGapCard({ gap }: { gap: Awaited<ReturnType<typeof loadBlitzGap>> }) {
+function BlitzGapCard({ gap }: { gap: Awaited<ReturnType<typeof loadGap>> }) {
   if (!gap) {
     return (
       <section className="card compact-card">
