@@ -7,7 +7,7 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { authEnv, isAllowed } from "@/lib/auth";
+import { authEnv, verifiedLogin } from "@/lib/auth";
 
 const PUBLIC_PATHS = ["/login", "/auth/"];
 
@@ -32,8 +32,8 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  const { data } = await supabase.auth.getUser();
-  const signedIn = !!data.user && isAllowed(data.user.email, env.allowed);
+  // Verifies (and if needed refreshes) the session token; see verifiedLogin in src/lib/auth.ts.
+  const signedIn = (await verifiedLogin(supabase, env.allowed)) !== null;
 
   if (!signedIn && !isPublic) {
     const url = request.nextUrl.clone();

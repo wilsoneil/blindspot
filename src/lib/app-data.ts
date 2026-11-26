@@ -28,6 +28,16 @@ export const getAppContext = cache(async (): Promise<AppContext> => {
   if (!login) return { status: "signed-out", settings: DEFAULT_SETTINGS };
 
   try {
+    // Usually one query: the user and their settings together. The first sign-in (no user
+    // or no settings yet) goes the long way, which creates them.
+    const { data: found, error: findErr } = await db.from("users")
+      .select("id, settings(*)").eq("auth_user_id", login.authUserId).maybeSingle();
+    if (findErr) throw new Error(findErr.message);
+    const embedded = found?.settings as SettingsRow | SettingsRow[] | null | undefined;
+    const row = Array.isArray(embedded) ? embedded[0] : embedded;
+    if (found && row) {
+      return { status: "ready", db, userId: found.id as string, email: login.email, settings: settingsFromRow(row) };
+    }
     const userId = await getUserIdForLogin(db, login.authUserId);
     const { data, error } = await db.from("settings").select("*").eq("user_id", userId).single();
     if (error) throw new Error(error.message);
