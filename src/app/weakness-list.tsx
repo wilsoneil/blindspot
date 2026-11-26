@@ -5,14 +5,13 @@ import { describeKey } from "@/lib/analysis/profile";
 import { weaknessFromKey } from "@/lib/training/sources";
 import { MIN_THEME_ATTEMPTS, type ThemeRating } from "@/lib/progress/theme-ratings";
 import type { Trend } from "@/lib/progress/weakness-trend";
-import type { DrillStat } from "@/lib/training/stats";
 import type { StoredProfile } from "@/lib/weakness-store";
 
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
-export function WeaknessList({ profile, shown, drills = {}, themes = {}, trends = {} }: {
-  profile: StoredProfile; shown: number; drills?: Record<string, DrillStat>;
+export function WeaknessList({ profile, shown, themes = {}, trends = {} }: {
+  profile: StoredProfile; shown: number;
   /** Rating (or share solved) per weakness, from puzzles: the leading indicator. */
   themes?: Record<string, ThemeRating>;
   /** Cost per game in real games over time: the lagging indicator. */
@@ -41,23 +40,13 @@ export function WeaknessList({ profile, shown, drills = {}, themes = {}, trends 
             <div className="bar" aria-hidden="true">
               <div className="bar-fill" style={{ width: `${Math.max(w.severity, 2)}%` }} />
             </div>
-            <div className="small muted">
-              {w.mistakes} mistake{w.mistakes === 1 ? "" : "s"} in {w.games} game{w.games === 1 ? "" : "s"}
-            </div>
-            {themes[w.key] && <ThemeLine r={themes[w.key]} />}
-            {trends[w.key] && <TrendLine t={trends[w.key]} />}
-            {drills[w.key] && (
-              <div className="small weakness-training">
-                ▶ {drills[w.key].attempted} puzzle{drills[w.key].attempted === 1 ? "" : "s"} drilled this week
-                {" · "}{Math.round((100 * drills[w.key].solved) / drills[w.key].attempted)}% solved
-              </div>
-            )}
+            <RowStats theme={themes[w.key]} trend={trends[w.key]} />
           </li>
         ))}
       </ol>
       {top.some((w) => weaknessFromKey(w.key)) && (
         <div className="modes">
-          <span className="small muted">All weaknesses, mixed:</span>
+          <span className="small muted">Mixed:</span>
           <Link className="button" href={`/train/rush?tc=${encodeURIComponent(profile.profileKey)}`}>Rush</Link>
           <Link className="button" href={`/train/survival?tc=${encodeURIComponent(profile.profileKey)}`}>Survival</Link>
         </div>
@@ -68,57 +57,62 @@ export function WeaknessList({ profile, shown, drills = {}, themes = {}, trends 
         </p>
       )}
       <p className="small muted" style={{ marginBottom: 0 }}>
-        From {profile.gamesAnalysed.toLocaleString()} analysed games and {profile.mistakes.toLocaleString()} mistakes;
-        updated {formatDate(profile.computedAt)}. Severity is relative: 100 is your weakest area.
-        Tap Drill to train one. Weaknesses Lichess puzzles can&rsquo;t train use positions from your own games.
-        &ldquo;Loses you&rdquo; is the winning chance these mistakes throw away in your games, averaged per game
-        (recent games count more). It comes from games only, so it falls as training carries over. A mistake with
-        several labels counts for each, so the figures don&rsquo;t add up to a total.
+        Updated {formatDate(profile.computedAt)}
       </p>
+      <details className="how-to-read small muted">
+        <summary>How to read this</summary>
+        <ul>
+          <li>
+            <strong>The number and bar:</strong> how weak each area is compared with the rest of your game; 100 is your
+            weakest. From {profile.gamesAnalysed.toLocaleString()} analysed games and {profile.mistakes.toLocaleString()} mistakes.
+          </li>
+          <li>
+            <strong>Puzzles:</strong> your rating on puzzles with this theme (from {MIN_THEME_ATTEMPTS} puzzles), and its change
+            over 30 days. <strong>Positions:</strong> the share of positions from your own games you solved in time.
+          </li>
+          <li>
+            <strong>Games:</strong> the winning chance these mistakes lose you per game, recent games counting more. It comes
+            from games only, so it falls as training carries over; the arrow compares it with a month ago. A mistake with
+            several labels counts for each, so the figures don&rsquo;t add up to a total.
+          </li>
+          <li>
+            <strong>Drill</strong> trains one weakness; <strong>Rush</strong> and <strong>Survival</strong> mix them all.
+            Weaknesses Lichess puzzles can&rsquo;t train use positions from your own games.
+          </li>
+        </ul>
+      </details>
     </>
-  );
-}
-
-/** "Puzzle rating 1640 (+35 in 30 days)", or the share solved for own-game positions. */
-function ThemeLine({ r }: { r: ThemeRating }) {
-  if (r.kind === "own") {
-    return (
-      <div className="small muted">
-        Own positions: {Math.round((100 * r.solved) / r.attempts)}% of {r.attempts} solved in time
-      </div>
-    );
-  }
-  if (r.kind === "few") {
-    return (
-      <div className="small muted">
-        Puzzle rating after {MIN_THEME_ATTEMPTS} puzzles ({r.attempts} so far)
-      </div>
-    );
-  }
-  return (
-    <div className="small muted">
-      Puzzle rating <strong className="theme-rating">{r.rating}</strong>
-      {r.change !== null && Math.round(r.change) !== 0 && (
-        <span className={r.change > 0 ? "theme-up" : "theme-down"}> {r.change > 0 ? "+" : "−"}{Math.abs(r.change)} in 30 days</span>
-      )}
-      {" "}· {r.attempts} puzzles
-    </div>
   );
 }
 
 const pct = (x: number) => `${(100 * x).toFixed(1)}%`;
 
-/** "Loses you 3.1% winning chance per game, down from 4.2% a month ago", with a sparkline. */
-function TrendLine({ t }: { t: Trend }) {
+/** One line per weakness: "Puzzles 1642 ↑38 · Games 3.1% ↓" and a sparkline. */
+function RowStats({ theme, trend }: { theme?: ThemeRating; trend?: Trend }) {
+  if (!theme && !trend) return null;
   return (
-    <div className="small muted">
-      <Sparkline points={t.points.map((p) => p.v)} />
-      <span>
-        Loses you {pct(t.now)} winning chance per game
-        {t.direction === "falling" && <span className="theme-up">, down from {pct(t.then!)} a month ago</span>}
-        {t.direction === "rising" && <span className="theme-down">, up from {pct(t.then!)} a month ago</span>}
-        {t.direction === "steady" && <>, steady over the month</>}
-      </span>
+    <div className="small muted row-stats">
+      {theme?.kind === "rating" && (
+        <span>
+          Puzzles <strong className="stat-num">{theme.rating}</strong>
+          {theme.change !== null && theme.change !== 0 && (
+            <span className={theme.change > 0 ? "theme-up" : "theme-down"}> {theme.change > 0 ? "↑" : "↓"}{Math.abs(theme.change)}</span>
+          )}
+        </span>
+      )}
+      {theme?.kind === "few" && <span>Puzzles {theme.attempts}/{MIN_THEME_ATTEMPTS}</span>}
+      {theme?.kind === "own" && (
+        <span>Positions <strong className="stat-num">{Math.round((100 * theme.solved) / theme.attempts)}%</strong></span>
+      )}
+      {theme && trend && <span aria-hidden="true"> · </span>}
+      {trend && (
+        <span>
+          Games <strong className="stat-num">{pct(trend.now)}</strong>
+          {trend.direction === "falling" && <span className="theme-up" aria-label="down on a month ago"> ↓</span>}
+          {trend.direction === "rising" && <span className="theme-down" aria-label="up on a month ago"> ↑</span>}
+          {" "}<Sparkline points={trend.points.map((p) => p.v)} />
+        </span>
+      )}
     </div>
   );
 }

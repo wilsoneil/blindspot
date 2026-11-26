@@ -1,47 +1,19 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ANALYSIS_VERSION } from "@/lib/analysis/eval";
 import { getAppContext } from "@/lib/app-data";
 import type { Db } from "@/lib/db";
-import { describeTimeControl, type Settings } from "@/lib/settings";
+import { describeTimeControl } from "@/lib/settings";
 import { blitzGap, SMOOTHING_DAYS, type RatingSample } from "@/lib/progress/blitz-gap";
 import { chartSeries } from "@/lib/progress/series";
 import { themeRating, type ThemeAttempt, type ThemeRating } from "@/lib/progress/theme-ratings";
 import { MIN_RD, ratingHistory } from "@/lib/training/rating";
-import { recentDrills } from "@/lib/training/stats";
+import { loadStatus } from "@/lib/data-status";
 import {
-  ANALYSED_TIME_CLASSES, describeProfileKey, historyStart, loadProfiles, loadWeaknessTrends, profileKeyForSetting,
+  describeProfileKey, loadProfiles, loadWeaknessTrends, profileKeyForSetting,
 } from "@/lib/weakness-store";
 import { SetupNotice } from "./setup-notice";
 import { TrendChart } from "./trend-chart";
-import { formatDate, WeaknessList } from "./weakness-list";
-
-async function loadStatus(db: Db, userId: string, settings: Settings) {
-  const start = historyStart(settings.historyMonths, new Date())?.toISOString() ?? "1970-01-01T00:00:00Z";
-  const inWindow = () =>
-    db.from("games").select("id", { count: "exact", head: true })
-      .eq("user_id", userId).in("time_class", ANALYSED_TIME_CLASSES).gte("played_at", start);
-  const [allGames, lastGame, puzzles, ratings, analysed, waiting] = await Promise.all([
-    db.from("games").select("id", { count: "exact", head: true }).eq("user_id", userId),
-    db.from("games").select("played_at").eq("user_id", userId).order("played_at", { ascending: false }).limit(1),
-    db.from("puzzles").select("id", { count: "estimated", head: true }),
-    db.from("rating_snapshots").select("time_class, rating, taken_on").eq("user_id", userId)
-      .order("taken_on", { ascending: false }).limit(8),
-    inWindow().not("analysed_at", "is", null).eq("analysis_version", ANALYSIS_VERSION),
-    inWindow().or(`analysis_version.is.null,analysis_version.lt.${ANALYSIS_VERSION}`),
-  ]);
-  const latest = new Map<string, number>();
-  for (const r of ratings.data ?? []) if (!latest.has(r.time_class)) latest.set(r.time_class, r.rating);
-  return {
-    allGames: allGames.count ?? 0,
-    lastGame: lastGame.data?.[0]?.played_at as string | undefined,
-    puzzles: puzzles.count ?? 0,
-    blitz: latest.get("blitz"),
-    daily: latest.get("daily"),
-    analysed: analysed.count ?? 0,
-    waiting: waiting.count ?? 0,
-  };
-}
+import { WeaknessList } from "./weakness-list";
 
 export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const ctx = await getAppContext();
@@ -49,11 +21,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   if (ctx.status !== "ready") return <SetupNotice ctx={ctx} />;
 
   const { settings } = ctx;
-  const [s, profiles, params, drills, history, gap, themeAttempts] = await Promise.all([
+  const [s, profiles, params, history, gap, themeAttempts] = await Promise.all([
     loadStatus(ctx.db, ctx.userId, settings),
     loadProfiles(ctx.db, ctx.userId),
     searchParams,
-    recentDrills(ctx.db, ctx.userId),
     loadRating(ctx.db, ctx.userId),
     loadBlitzGap(ctx.db, ctx.userId),
     loadThemeAttempts(ctx.db, ctx.userId),
@@ -98,7 +69,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           </nav>
         )}
         {profile && profile.top.length > 0 ? (
-          <WeaknessList profile={profile} shown={settings.weaknessesShown} drills={drills}
+          <WeaknessList profile={profile} shown={settings.weaknessesShown}
             themes={themeRatings(profile.top.map((w) => w.key), themeAttempts)} trends={trends} />
         ) : (
           <p className="muted" style={{ marginBottom: 0 }}>
@@ -122,32 +93,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         </section>
       )}
 
-      <section className="card">
-        <h2>Your data</h2>
-        <div className="stats">
-          <div className="stat">
-            <div className="stat-value">{s.allGames.toLocaleString()}</div>
-            <div className="stat-label">games imported</div>
-          </div>
-          <div className="stat">
-            <div className="stat-value">{s.analysed.toLocaleString()}</div>
-            <div className="stat-label">games analysed</div>
-          </div>
-          <div className="stat">
-            <div className="stat-value">{s.puzzles.toLocaleString()}</div>
-            <div className="stat-label">puzzles in the store</div>
-          </div>
-          <div className="stat">
-            <div className="stat-value">
-              {s.blitz ?? "–"} <span className="muted">/</span> {s.daily ?? "–"}
-            </div>
-            <div className="stat-label">blitz / daily rating</div>
-          </div>
-        </div>
-        <p className="small muted" style={{ marginTop: "0.75rem", marginBottom: 0 }}>
-          {s.lastGame ? `Latest game: ${formatDate(s.lastGame)}.` : "No games imported yet."}
-        </p>
-      </section>
     </>
   );
 }
@@ -183,7 +128,7 @@ function RatingCard({ rating }: { rating: Awaited<ReturnType<typeof loadRating>>
       </div>
       <TrendChart series={series} label="Blindspot rating" initial="month" />
       <p className="small muted" style={{ margin: "0.35rem 0 0" }}>
-        From your first attempts at {count.toLocaleString()} puzzle{count === 1 ? "" : "s"}. It only rises for puzzles solved within the target time.
+        {count.toLocaleString()} puzzle{count === 1 ? "" : "s"}
       </p>
     </section>
   );
@@ -236,8 +181,7 @@ function BlitzGapCard({ gap }: { gap: Awaited<ReturnType<typeof loadBlitzGap>> }
       </div>
       <TrendChart series={gap.chart} label="Blitz gap" colour={2} goodWhen="down" initial="month" />
       <p className="small muted" style={{ margin: "0.35rem 0 0" }}>
-        Daily {gap.daily.average} minus blitz {gap.blitz.average}, each a {SMOOTHING_DAYS}-day average.
-        Latest: daily {gap.daily.latest}, blitz {gap.blitz.latest}.
+        Daily {gap.daily.average} − Blitz {gap.blitz.average} ({SMOOTHING_DAYS}-day averages)
       </p>
     </section>
   );

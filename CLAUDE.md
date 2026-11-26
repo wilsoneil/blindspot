@@ -33,6 +33,7 @@ Update this section when a phase is finished.
 2. Blitz gap: daily minus blitz rating, each a 30-day average, "600 and falling", chart, both ratings in small print: **done** (`src/lib/progress/blitz-gap.ts`; history from `games.user_rating` plus `rating_snapshots`)
 3. Theme ratings: a Glicko-2 rating per weakness from first attempts at puzzles carrying its labels, on each row of the top-weaknesses list: **done** (`src/lib/progress/theme-ratings.ts`; own-position weaknesses show the share solved; openings none yet)
 4. Weakness trend from games: **done**; migration 0007 applied and history backfilled (48 weeks blitz, 47 daily) (`weakness_history`; written by the daily analysis job via `rebuildProfiles(..., { history: true })`, whose first run backfills weekly points; `src/lib/progress/weakness-trend.ts`; shown per weakness as cost per game with a sparkline)
+   - Feedback: home page simplified (one progress line per weakness, "How to read this" folded away, "Your data" moved to Settings, the "drilled this week" line dropped)
 5. Review; mark Phase 4 done
 
 ### Notes for later phases
