@@ -12,7 +12,7 @@ import {
   describeProfileKey, loadProfiles, loadWeaknessTrends, profileKeyForSetting,
 } from "@/lib/weakness-store";
 import { SetupNotice } from "./setup-notice";
-import { TrendChart } from "./trend-chart";
+import { CompactTrend } from "./trend-chart";
 import { WeaknessList } from "./weakness-list";
 
 export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -43,7 +43,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   return (
     <>
       <RatingCard rating={history} />
-      {settings.chesscomUsername && <BlitzGapCard gap={gap} />}
 
       {!settings.chesscomUsername && (
         <section className="card notice">
@@ -80,6 +79,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         )}
       </section>
 
+      {settings.chesscomUsername && <BlitzGapCard gap={gap} />}
+
       {s.waiting > 0 && (
         <section className="card">
           <h2>Analysis</h2>
@@ -110,7 +111,7 @@ function RatingCard({ rating }: { rating: Awaited<ReturnType<typeof loadRating>>
   const { last, count, series } = rating;
   if (!last) {
     return (
-      <section className="card">
+      <section className="card compact-card">
         <div className="headline-label">Blindspot rating</div>
         <p className="small muted" style={{ margin: "0.25rem 0 0" }}>
           Your rating appears after your first puzzles in Drill, Rush or Survival.
@@ -121,15 +122,11 @@ function RatingCard({ rating }: { rating: Awaited<ReturnType<typeof loadRating>>
   // Glicko-2 is unsure of a new rating; say so until it has settled a little.
   const provisional = last.rd > 2 * MIN_RD;
   return (
-    <section className="card">
-      <div className="headline-label">Blindspot rating</div>
-      <div className="headline-value">
-        {Math.round(last.rating)}{provisional && <span className="small muted" style={{ fontWeight: 400 }}> provisional</span>}
-      </div>
-      <TrendChart series={series} label="Blindspot rating" initial="month" />
-      <p className="small muted" style={{ margin: "0.35rem 0 0" }}>
-        {count.toLocaleString()} puzzle{count === 1 ? "" : "s"}
-      </p>
+    <section className="card compact-card">
+      <CompactTrend
+        title={<>Blindspot rating <span className="muted">· {count.toLocaleString()} puzzle{count === 1 ? "" : "s"}</span></>}
+        value={<>{Math.round(last.rating)}{provisional && <span className="small muted" style={{ fontWeight: 400 }}> provisional</span>}</>}
+        series={series} label="Blindspot rating" />
     </section>
   );
 }
@@ -161,11 +158,11 @@ async function loadBlitzGap(db: Db, userId: string) {
 
 const TREND_WORDS = { falling: "and falling", rising: "and rising", steady: "and steady" } as const;
 
-/** The Blitz gap, smaller beneath the rating (SPEC.md -> "Progress and headline metrics"). */
+/** The Blitz gap, below the top weaknesses (SPEC.md -> "Progress and headline metrics"). */
 function BlitzGapCard({ gap }: { gap: Awaited<ReturnType<typeof loadBlitzGap>> }) {
   if (!gap) {
     return (
-      <section className="card">
+      <section className="card compact-card">
         <div className="headline-label">Blitz gap</div>
         <p className="small muted" style={{ margin: "0.25rem 0 0" }}>
           Appears once you have both a Daily and a Blitz rating on chess.com.
@@ -174,15 +171,12 @@ function BlitzGapCard({ gap }: { gap: Awaited<ReturnType<typeof loadBlitzGap>> }
     );
   }
   return (
-    <section className="card">
-      <div className="headline-label">Blitz gap</div>
-      <div className="gap-value">
-        {gap.gap} <span className={`small gap-trend ${gap.trend}`}>{TREND_WORDS[gap.trend]}</span>
-      </div>
-      <TrendChart series={gap.chart} label="Blitz gap" colour={2} goodWhen="down" initial="month" />
-      <p className="small muted" style={{ margin: "0.35rem 0 0" }}>
-        Daily {gap.daily.average} − Blitz {gap.blitz.average} ({SMOOTHING_DAYS}-day averages)
-      </p>
+    <section className="card compact-card">
+      <CompactTrend
+        title="Blitz gap"
+        value={<>{gap.gap < 0 ? `−${-gap.gap}` : gap.gap} <span className={`small gap-trend ${gap.trend}`}>{TREND_WORDS[gap.trend]}</span></>}
+        footnote={<>Daily {gap.daily.average} − Blitz {gap.blitz.average} ({SMOOTHING_DAYS}-day averages)</>}
+        series={gap.chart} label="Blitz gap" colour={2} goodWhen="down" />
     </section>
   );
 }
