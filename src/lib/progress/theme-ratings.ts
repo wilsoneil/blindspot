@@ -29,17 +29,17 @@ export type ThemeRating =
   | { kind: "few"; attempts: number }
   | { kind: "own"; attempts: number; solved: number };
 
+/** Null only for weaknesses that can't be trained yet (openings); otherwise a count from zero. */
 export function themeRating(key: string, attempts: ThemeAttempt[], now: number): ThemeRating | null {
   const w = weaknessFromKey(key);
   if (!w || w.kind === "opening") return null;
 
   if (w.kind === "ownGames") {
     const own = attempts.filter((a) => a.puzzleRating === null && w.labelKeys.every((l) => a.labels.includes(l)));
-    return own.length ? { kind: "own", attempts: own.length, solved: own.filter((a) => a.fullySolved).length } : null;
+    return { kind: "own", attempts: own.length, solved: own.filter((a) => a.fullySolved).length };
   }
 
   const rated = attempts.filter((a) => a.puzzleRating !== null && w.puzzleLabels.every((l) => a.labels.includes(l)));
-  if (rated.length === 0) return null;
   if (rated.length < MIN_THEME_ATTEMPTS) return { kind: "few", attempts: rated.length };
   const history = replay(rated.map((a) => ({ puzzleRating: a.puzzleRating!, fullySolved: a.fullySolved })));
   const rating = Math.round(history[history.length - 1].rating);

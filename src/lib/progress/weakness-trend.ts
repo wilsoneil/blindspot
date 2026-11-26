@@ -16,9 +16,9 @@ export const TREND_DAYS = 30;
 /** Changes smaller than this share of the earlier value count as steady. */
 export const STEADY_SHARE = 0.1;
 
-/** The weaknesses worth a history row: every single category with evidence, and the pairs shown. */
+/** The weaknesses worth a history row: every single category and every pair with evidence. */
 export function historyEntries(p: Profile): WeaknessEntry[] {
-  return [...p.all, ...p.top.filter((e) => e.labels.length > 1)];
+  return [...p.all, ...p.pairs];
 }
 
 /** Dates (milliseconds) for the one-off backfill: weekly, from four weeks after the first game to before today. */

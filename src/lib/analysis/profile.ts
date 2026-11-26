@@ -89,6 +89,11 @@ export interface Profile {
   all: WeaknessEntry[];
   gamesAnalysed: number;
   mistakes: number;
+  /**
+   * Every pair with mistakes in at least PAIR_MIN_GAMES games, whether or not it is shown,
+   * for the weakness history: a pair that later rises into the top list already has its trend.
+   */
+  pairs: WeaknessEntry[];
   /** Only when asked for (`review: true`); never saved. */
   review?: ProfileReview;
 }
@@ -307,6 +312,7 @@ export async function buildProfile(games: ProfileGame[], mistakes: ProfileMistak
   const inTop = new Set(all.slice(0, TOP_LIST_SIZE + MAX_PAIRS).map((e) => e.key));
   const bestPairFor = new Map<string, WeaknessEntry>();
   const checks: PairCheck[] = [];
+  const evidencedPairs: WeaknessEntry[] = [];
   // The review counts positions for every pair: ask the database for them in parallel, not one by one.
   const reviewPositions = new Map<string, TrainingPositions>();
   if (o.review) {
@@ -325,6 +331,7 @@ export async function buildProfile(games: ProfileGame[], mistakes: ProfileMistak
     const expected = (stats.get(a)!.cost * stats.get(b)!.cost) / totalCost;
     const lift = (s.cost + PAIR_PRIOR_COST) / (expected + PAIR_PRIOR_COST);
     const score = scoreOf.get(parent)! * lift;
+    evidencedPairs.push(entry(pk, [a, b], s, score));
     const failed: PairOutcome | null =
       !inTop.has(parent) ? "parentNotInTop" : lift < PAIR_MIN_LIFT ? "notClearlyWorse" : null;
     if (o.review) {
@@ -362,7 +369,11 @@ export async function buildProfile(games: ProfileGame[], mistakes: ProfileMistak
     e.perGame = Math.round(e.perGame * 1e5) / 1e5;
   }
 
-  const profile: Profile = { top, all, gamesAnalysed: games.length, mistakes: counted };
+  for (const e of evidencedPairs) {
+    e.score = Math.round(e.score * 1000) / 1000;
+    e.perGame = Math.round(e.perGame * 1e5) / 1e5;
+  }
+  const profile: Profile = { top, all, pairs: evidencedPairs, gamesAnalysed: games.length, mistakes: counted };
   if (o.review) {
     const pairChecks = settlePairs(checks, bestPairFor, allowedPairs, top);
     profile.review = { pairs: pairChecks, families: familyChecks(stats, all, top, pairChecks) };
