@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 26 Nov 2026 (Blitz gap stored daily by the import job)
+Last updated: 26 Nov 2026 (Drill: no retry after a solve)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -124,7 +124,7 @@ Three modes, all drawing only on puzzles matched to the weakness profile. Drill 
 
 | Mode | Puzzles from | Format | Mistakes |
 | --- | --- | --- | --- |
-| Drill | One chosen weakness | Timed and logged, own pace | Unlimited retries, reveal solution, analysis board; once the analysis board has been opened, no retry of that puzzle (a miss comes back later as a review) |
+| Drill | One chosen weakness | Timed and logged, own pace | Unlimited retries, reveal solution, analysis board; no retry after a clean solve (no wrong move, no reveal), or once the analysis board has been opened (a miss comes back later as a review) |
 | Rush | All top weaknesses, shuffled, plus due reviews | As many as possible in 5 minutes (fixed), rising difficulty | A wrong move ends that puzzle, no retry; three failed puzzles end the run |
 | Survival | All top weaknesses, shuffled, plus due reviews | Open-ended, rising difficulty | A wrong move ends that puzzle; three failed puzzles (setting) end the run |
 
