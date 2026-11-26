@@ -64,7 +64,7 @@ Update this section when a phase is finished.
 
 - `npm run dev`: local site; `npm test`: tests; `npm run lint`; `npm run build`
 - `npm run import:games`, `npm run analyse:games -- --limit 5`, `npm run find:moves`, `npm run build:puzzles -- --dry-run`: data jobs (also GitHub Actions workflows)
-- Database changes go in a new numbered file in `supabase/migrations/`; never edit an applied one.
+- Database changes go in a new numbered file in `supabase/migrations/`; never edit an applied one. When a migration needs applying, paste its SQL in the chat, ready to copy into the Supabase SQL editor (comments can be left out); don't just link to the file or the pull request.
 - Next.js here is 16.x, newer than most training data: check `node_modules/next/dist/docs/` before using an unfamiliar API (see AGENTS.md). Cache Components is deliberately off.
 
 ## Stack
