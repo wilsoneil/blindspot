@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHUNK, chunkWeaknesses, ladderRating, mixedWeaknesses, selectRunPuzzles, shuffled } from "../src/lib/training/run";
+import { CHUNK, chunkWeaknesses, LADDERS, ladderRating, mixedWeaknesses, selectRunPuzzles, shuffled } from "../src/lib/training/run";
 import { fakeDb } from "./fake-db";
 
 /** A weakness trained by Lichess puzzles with one label. */
@@ -20,10 +20,15 @@ function store(labels: string[]) {
 }
 
 describe("the ladder", () => {
-  it("starts 300 below the user's level and rises 25 per puzzle", () => {
+  it("Survival starts 300 below the user's level and rises 25 per puzzle", () => {
     expect(ladderRating(1500, 0)).toBe(1200);
     expect(ladderRating(1500, 12)).toBe(1500);
     expect(ladderRating(1500, 20)).toBe(1700);
+  });
+
+  it("Rush starts 600 below and rises 10 per puzzle", () => {
+    expect(ladderRating(1500, 0, LADDERS.rush)).toBe(900);
+    expect(ladderRating(1500, 30, LADDERS.rush)).toBe(1200);
   });
 
   it("cycles through the weaknesses, a few per chunk", () => {

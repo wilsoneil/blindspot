@@ -51,7 +51,7 @@ export async function MixedModePage({ mode, tc }: { mode: "rush" | "survival"; t
     );
   }
 
-  const puzzles = await selectRunPuzzles(ctx.db, { userId: ctx.userId, weaknesses, level, fromChunk: 0, chunks: 2 });
+  const puzzles = await selectRunPuzzles(ctx.db, { userId: ctx.userId, weaknesses, level, mode, fromChunk: 0, chunks: 2 });
   return (
     <section className="card">
       <h1>{title} <span className="pill">{describeProfileKey(profileKey)}</span></h1>
@@ -63,6 +63,7 @@ export async function MixedModePage({ mode, tc }: { mode: "rush" | "survival"; t
         rushMs={RUSH_MINUTES * 60_000}
         lives={mode === "rush" ? RUSH_LIVES : ctx.settings.survivalLives}
         stats={stats}
+        engineDefault={ctx.settings.engineOnBoard}
         intro={`${TEXT[mode](ctx.settings)} Puzzles come from all your top weaknesses, mixed with earlier misses that are due for another look.`}
       />
       {back}

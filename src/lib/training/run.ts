@@ -1,8 +1,8 @@
 // Puzzles for the mixed modes, Rush and Survival (SPEC.md -> "Training modes"): all the
 // top weaknesses shuffled together, with rising difficulty.
 //
-// A run is a ladder: puzzle i aims at LADDER_START below the user's level plus LADDER_STEP
-// per puzzle. Puzzles come in chunks of CHUNK; each chunk takes PER_WEAKNESS puzzles from
+// A run is a ladder: puzzle i aims at the ladder's start below the user's level plus its step
+// per puzzle (LADDERS: Rush starts lower and climbs slower, as it trains speed). Puzzles come in chunks of CHUNK; each chunk takes PER_WEAKNESS puzzles from
 // each of the next few weaknesses in turn, so every chunk mixes weaknesses. Up to
 // REVIEWS_PER_CHUNK of each chunk are earlier misses due for review (the spaced-repetition
 // queue), each placed in the chunk matching its own difficulty (placeReviews).
@@ -13,8 +13,13 @@ import { dueReviews } from "./review";
 import { attemptedPuzzleIds, type TrainingPuzzle } from "./select";
 import { selectFor, weaknessFromKey, type Weakness } from "./sources";
 
-export const LADDER_START = -300;
-export const LADDER_STEP = 25;
+export type RunMode = "rush" | "survival";
+export interface Ladder { start: number; step: number }
+/** Rush trains speed: easy at first, climbing slowly. Survival tests the limit. */
+export const LADDERS: Record<RunMode, Ladder> = {
+  rush: { start: -600, step: 10 },
+  survival: { start: -300, step: 25 },
+};
 export const CHUNK = 6;
 const PER_WEAKNESS = 2;
 /** At most a third of a run is reviews, so a long review queue never crowds out new puzzles. */
@@ -54,8 +59,8 @@ export async function loadDueReviews(
 }
 
 /** The rating the ladder aims at for puzzle number i (from 0). */
-export function ladderRating(level: number, i: number): number {
-  return level + LADDER_START + LADDER_STEP * i;
+export function ladderRating(level: number, i: number, ladder: Ladder = LADDERS.survival): number {
+  return level + ladder.start + ladder.step * i;
 }
 
 /** Which weaknesses (indexes into the list) fill chunk number c. */
@@ -70,6 +75,8 @@ export interface RunSelect {
   /** The trainable top weaknesses, in a fixed (shuffled) order. */
   weaknesses: Weakness[];
   level: number;
+  /** Rush or Survival, for the ladder (default Survival). */
+  mode?: RunMode;
   /** First chunk to fetch, and how many. */
   fromChunk: number;
   chunks: number;
@@ -88,10 +95,11 @@ export async function selectRunPuzzles(db: Pick<Db, "from">, o: RunSelect): Prom
     attemptedPuzzleIds(db, o.userId),
     loadDueReviews(db, o.userId, { limit: MAX_DUE_REVIEWS, level: o.level, exclude: taken, now: o.now }),
   ]);
-  const byChunk = placeReviews(reviews, o.level, o.fromChunk, o.chunks);
+  const ladder = LADDERS[o.mode ?? "survival"];
+  const byChunk = placeReviews(reviews, o.level, o.fromChunk, o.chunks, ladder);
   const out: RunPuzzle[] = [];
   for (let c = o.fromChunk; c < o.fromChunk + o.chunks; c++) {
-    const centre = ladderRating(o.level, c * CHUNK + (CHUNK - 1) / 2);
+    const centre = ladderRating(o.level, c * CHUNK + (CHUNK - 1) / 2, ladder);
     const chunkReviews = byChunk.get(c) ?? [];
     for (const r of chunkReviews) taken.add(r.id);
     const picks = await Promise.all(chunkWeaknesses(o.weaknesses.length, c).map((w) =>
@@ -116,8 +124,8 @@ export async function selectRunPuzzles(db: Pick<Db, "from">, o: RunSelect): Prom
 }
 
 /** The chunk whose difficulty best matches a rating (never before `from`). */
-export function chunkForRating(level: number, rating: number, from: number): number {
-  const c = Math.round((rating - ladderRating(level, (CHUNK - 1) / 2)) / (LADDER_STEP * CHUNK));
+export function chunkForRating(level: number, rating: number, from: number, ladder: Ladder = LADDERS.survival): number {
+  const c = Math.round((rating - ladderRating(level, (CHUNK - 1) / 2, ladder)) / (ladder.step * CHUNK));
   return Math.max(from, c);
 }
 
@@ -127,10 +135,12 @@ export function chunkForRating(level: number, rating: number, from: number): num
  * the next chunk when one is full, so the oldest that fit get the places. Reviews harder
  * than every chunk fetched now wait for a later fetch.
  */
-export function placeReviews(reviews: RunPuzzle[], level: number, from: number, chunks: number): Map<number, RunPuzzle[]> {
+export function placeReviews(
+  reviews: RunPuzzle[], level: number, from: number, chunks: number, ladder: Ladder = LADDERS.survival,
+): Map<number, RunPuzzle[]> {
   const out = new Map<number, RunPuzzle[]>();
   for (const r of reviews) {
-    for (let c = chunkForRating(level, r.rating, from); c < from + chunks; c++) {
+    for (let c = chunkForRating(level, r.rating, from, ladder); c < from + chunks; c++) {
       const list = out.get(c) ?? [];
       if (list.length < REVIEWS_PER_CHUNK) {
         out.set(c, [...list, r]);

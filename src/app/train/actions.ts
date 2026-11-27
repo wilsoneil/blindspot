@@ -12,7 +12,7 @@ import { settingsFromRow, type Settings, type SettingsRow } from "@/lib/settings
 import { AttemptError, recordPuzzleAttempt, type AttemptInput, type AttemptOutcome } from "@/lib/training/attempts";
 import { clientPuzzle, type ClientPuzzle } from "@/lib/training/client-puzzle";
 import { puzzleLevel } from "@/lib/training/rating";
-import { selectRunPuzzles } from "@/lib/training/run";
+import { selectRunPuzzles, type RunMode } from "@/lib/training/run";
 import { selectFor, weaknessFromKey } from "@/lib/training/sources";
 import { getUserIdForLogin } from "@/lib/user";
 import { rebuildProfiles } from "@/lib/weakness-store";
@@ -77,7 +77,7 @@ export async function morePuzzles(weaknessKey: string, exclude: string[]): Promi
 
 /** The next chunks of a Rush or Survival run. `weaknessKeys` is the run's weakness order. */
 export async function moreRunPuzzles(
-  weaknessKeys: string[], fromChunk: number, exclude: string[],
+  mode: RunMode, weaknessKeys: string[], fromChunk: number, exclude: string[],
 ): Promise<ActionResult<ClientPuzzle[]>> {
   try {
     const ctx = await signedIn();
@@ -85,7 +85,7 @@ export async function moreRunPuzzles(
     const weaknesses = weaknessesOf(weaknessKeys);
     const level = await puzzleLevel(ctx.db, ctx.userId);
     const puzzles = await selectRunPuzzles(ctx.db, {
-      userId: ctx.userId, weaknesses, level, fromChunk: Math.max(0, Math.floor(fromChunk)), chunks: 2,
+      userId: ctx.userId, weaknesses, level, mode: mode === "rush" ? "rush" : "survival", fromChunk: Math.max(0, Math.floor(fromChunk)), chunks: 2,
       exclude: exclude.slice(0, 1000),
     });
     return { ok: true, value: puzzles.map((p) => clientPuzzle(p, ctx.settings, level)) };
