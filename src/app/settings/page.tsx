@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getAppContext } from "@/lib/app-data";
 import { loadStatus } from "@/lib/data-status";
 import { describeTimeControl } from "@/lib/settings";
+import { loadRatingCard, RatingCard } from "../rating-card";
 import { SetupNotice } from "../setup-notice";
 import { formatDate } from "../weakness-list";
 import { SettingsForm, type TimeControlOption } from "./settings-form";
@@ -22,7 +23,9 @@ export default async function SettingsPage() {
     );
   }
 
-  const status = await loadStatus(ctx.db, ctx.userId, ctx.settings);
+  const [status, rating] = await Promise.all([
+    loadStatus(ctx.db, ctx.userId, ctx.settings), loadRatingCard(ctx.db, ctx.userId),
+  ]);
 
   // Time controls offered = the ones actually played, plus the default and current choice.
   const { data } = await ctx.db.from("games").select("time_control").eq("user_id", ctx.userId).limit(20000);
@@ -37,6 +40,8 @@ export default async function SettingsPage() {
     <>
       <h1>Settings</h1>
       <SettingsForm settings={ctx.settings} timeControls={timeControls} />
+
+      <RatingCard rating={rating} />
 
       <section className="card">
         <h2>Your data</h2>
