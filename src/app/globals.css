@@ -251,6 +251,8 @@ input[type="radio"] { accent-color: var(--accent); width: 1.1rem; height: 1.1rem
 }
 
 .link-button:hover { color: var(--text); }
+/* A button that looks like the links beside it (Rush and Survival results). */
+.link-button.inline-link { color: var(--accent); text-decoration: underline; font-weight: inherit; text-align: left; }
 
 /* Weakness profile */
 .filters {

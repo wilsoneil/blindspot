@@ -10,6 +10,7 @@ import { attemptRef, type ClientPuzzle } from "@/lib/training/client-puzzle";
 import { CHUNK } from "@/lib/training/run";
 import type { RunStats } from "@/lib/training/stats";
 import { moreRunPuzzles, saveAttempt } from "./actions";
+import { AnalysisBoard } from "./analysis-board";
 import { PuzzleBoard, type PuzzleResult } from "./puzzle-board";
 
 interface Props {
@@ -23,12 +24,16 @@ interface Props {
   intro: string;
   /** Past runs of this mode, shown before the run starts. */
   stats: RunStats;
+  /** Engine on when an own position is opened on the analysis board afterwards. */
+  engineDefault: boolean;
 }
 
 type Done = { puzzle: ClientPuzzle; correct: boolean };
 const NEXT_DELAY_MS = 600;
 
-export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives, intro, stats }: Props) {
+export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives, intro, stats, engineDefault }: Props) {
+  /** An own position opened from the results, on the analysis board. */
+  const [reviewing, setReviewing] = useState<ClientPuzzle | null>(null);
   const [phase, setPhase] = useState<"ready" | "playing" | "over">("ready");
   const [queue, setQueue] = useState(initial);
   const [index, setIndex] = useState(0);
@@ -70,7 +75,7 @@ export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives, in
   async function topUp(currentIndex: number, current: ClientPuzzle[]) {
     if (fetching.current || current.length - currentIndex > 3) return;
     fetching.current = true;
-    const more = await moreRunPuzzles(weaknessKeys, nextChunk.current, current.map((p) => p.id));
+    const more = await moreRunPuzzles(mode, weaknessKeys, nextChunk.current, current.map((p) => p.id));
     fetching.current = false;
     const fresh = more.ok ? more.value.filter((p) => !current.some((x) => x.id === p.id)) : [];
     nextChunk.current += 2;
@@ -133,6 +138,25 @@ export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives, in
     );
   }
 
+  if (phase === "over" && reviewing?.position) {
+    const pos = reviewing.position;
+    return (
+      <div style={{ margin: "0.5rem 0 1rem" }}>
+        <AnalysisBoard
+          fen={reviewing.fen}
+          line={pos.accepted.slice(0, 1)}
+          orientation={reviewing.fen.split(" ")[1] === "w" ? "white" : "black"}
+          startPly={0}
+          gameMove={{ uci: pos.playedUci, san: pos.playedSan, refutation: pos.refutation }}
+          engineDefault={engineDefault}
+        />
+        <button type="button" className="button" style={{ marginTop: "0.75rem" }} onClick={() => setReviewing(null)}>
+          Back to results
+        </button>
+      </div>
+    );
+  }
+
   if (phase === "over") {
     return (
       <div style={{ margin: "0.5rem 0 1rem" }}>
@@ -150,7 +174,10 @@ export function Run({ mode, profileKey, weaknessKeys, initial, rushMs, lives, in
               <li key={d.puzzle.id}>
                 <span className={d.correct ? "check" : "cross"}>{d.correct ? "✓" : "✗"}</span>{" "}
                 {d.puzzle.position ? (
-                  <span>Your game: {d.puzzle.position.bestSan} <span className="muted">(you played {d.puzzle.position.playedSan})</span></span>
+                  <span>
+                    <button type="button" className="link-button inline-link" onClick={() => setReviewing(d.puzzle)}>Your game: {d.puzzle.position.bestSan}</button>{" "}
+                    <span className="muted">(you played {d.puzzle.position.playedSan})</span>
+                  </span>
                 ) : (
                   <>
                     <a href={`https://lichess.org/training/${d.puzzle.id}`} target="_blank" rel="noreferrer">{d.puzzle.id}</a>{" "}
