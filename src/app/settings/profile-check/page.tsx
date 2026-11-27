@@ -10,6 +10,9 @@ import {
   MAX_PAIRS, MIN_GAMES, PAIR_MIN_GAMES, PAIR_MIN_LIFT, PAIR_MIN_OWN_POSITIONS, PAIR_MIN_PUZZLES, type PairCheck, type PairOutcome,
 } from "@/lib/analysis/profile";
 import { describeProfileKey, profileKeyForSetting, reviewProfile } from "@/lib/weakness-store";
+import {
+  expectedSolved, fitCalibration, loadTrainingHistory, MIN_CALIBRATION_ATTEMPTS, positionRating, type PositionAttempt,
+} from "@/lib/training/position-rating";
 import { SetupNotice } from "../../setup-notice";
 
 export const metadata: Metadata = { title: "Profile check · Blindspot" };
@@ -35,6 +38,50 @@ const OUTCOME: Record<PairOutcome, string> = {
   pairLimit: `Already ${MAX_PAIRS} stronger pairs`,
   outOfTop: "Passed, but not high enough",
 };
+
+/** How own positions are rated: the fixed rule against the one fitted to the user's results. */
+function PositionRatings({ positions, level }: { positions: PositionAttempt[]; level: number }) {
+  const calibration = fitCalibration(positions);
+  const solved = positions.filter((p) => p.fullySolved).length;
+  const pct = (x: number) => `${Math.round(100 * x)}%`;
+  return (
+    <section className="card">
+      <h2>Own-position ratings</h2>
+      <p className="small muted">
+        Positions from your games get a stand-in rating from how subtle the best move is. Until there
+        are {MIN_CALIBRATION_ATTEMPTS} first attempts at them, it runs from 400 below your Blindspot rating (obvious) to
+        400 above (subtle). After that, it is fitted to how often you solve them.
+      </p>
+      <p className="small">
+        {positions.length.toLocaleString()} attempts counted{positions.length > 0 && <>, {pct(solved / positions.length)} solved in time</>}.{" "}
+        {calibration ? "Using the fitted rule." : `Using the fixed rule (${MIN_CALIBRATION_ATTEMPTS - positions.length} more needed).`}
+      </p>
+      {positions.length > 0 && (
+        <div className="table-wrap">
+          <table className="check-table">
+            <thead>
+              <tr><th>Subtlety</th><th>Fixed rule</th><th>Fitted</th></tr>
+            </thead>
+            <tbody>
+              {[0, 0.25, 0.5, 0.75, 1].map((s) => (
+                <tr key={s}>
+                  <td>{s}</td>
+                  <td>{positionRating(level, s, null)}</td>
+                  <td>{calibration ? positionRating(level, s, calibration) : "–"}</td>
+                </tr>
+              ))}
+              <tr>
+                <td>Expected solved</td>
+                <td>{pct(expectedSolved(positions, null))}</td>
+                <td>{calibration ? pct(expectedSolved(positions, calibration)) : "–"}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
 
 const OUTCOME_ORDER: PairOutcome[] = [
   "shown", "outOfTop", "pairLimit", "anotherPairBetter", "fewPositions", "notClearlyWorse", "parentNotInTop",
@@ -72,7 +119,9 @@ export default async function ProfileCheckPage({ searchParams }: PageProps<"/set
 
   const params = await searchParams;
   const key = typeof params.tc === "string" ? params.tc : profileKeyForSetting(ctx.settings.focusTimeControl);
-  const profile = await reviewProfile(ctx.db, ctx.userId, ctx.settings, key);
+  const [profile, history] = await Promise.all([
+    reviewProfile(ctx.db, ctx.userId, ctx.settings, key), loadTrainingHistory(ctx.db, ctx.userId),
+  ]);
   if (!profile?.review) {
     return (
       <section className="card">
@@ -167,6 +216,8 @@ export default async function ProfileCheckPage({ searchParams }: PageProps<"/set
           <PairTable pairs={pairs} empty="None." outcome />
         </details>
       </section>
+
+      <PositionRatings positions={history.positions} level={Math.round(history.rating.rating)} />
     </>
   );
 }

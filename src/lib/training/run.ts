@@ -8,6 +8,7 @@
 // queue), each placed in the chunk matching its own difficulty (placeReviews).
 
 import type { Db } from "../db";
+import type { PositionCalibration } from "./position-rating";
 import { positionFromMistake } from "./positions";
 import { dueReviews } from "./review";
 import { attemptedPuzzleIds, type TrainingPuzzle } from "./select";
@@ -31,7 +32,7 @@ export type RunPuzzle = TrainingPuzzle & { review?: boolean };
 
 /** Puzzles and own positions due for review now (not already in this run), oldest due first. */
 export async function loadDueReviews(
-  db: Pick<Db, "from">, userId: string, o: { limit: number; level: number; exclude?: Set<string>; now?: Date },
+  db: Pick<Db, "from">, userId: string, o: { limit: number; level: number; calibration?: PositionCalibration | null; exclude?: Set<string>; now?: Date },
 ): Promise<RunPuzzle[]> {
   const due = (await dueReviews(db, userId, o.limit, o.now))
     .filter((r) => !o.exclude?.has("puzzleId" in r ? r.puzzleId : `m${r.mistakeId}`));
@@ -52,7 +53,7 @@ export async function loadDueReviews(
       .eq("user_id", userId).in("id", mistakeIds);
     if (error) throw new Error(`Could not read review positions: ${error.message}`);
     for (const m of data as Parameters<typeof positionFromMistake>[0][]) {
-      if (m.accepted_moves?.length) out.push({ ...positionFromMistake(m, o.level), review: true });
+      if (m.accepted_moves?.length) out.push({ ...positionFromMistake(m, o.level, o.calibration), review: true });
     }
   }
   return out.sort((a, b) => order.get(a.id)! - order.get(b.id)!);
@@ -75,6 +76,8 @@ export interface RunSelect {
   /** The trainable top weaknesses, in a fixed (shuffled) order. */
   weaknesses: Weakness[];
   level: number;
+  /** The fitted own-position rule, if any (position-rating.ts). */
+  calibration?: PositionCalibration | null;
   /** Rush or Survival, for the ladder (default Survival). */
   mode?: RunMode;
   /** First chunk to fetch, and how many. */
@@ -93,7 +96,7 @@ export async function selectRunPuzzles(db: Pick<Db, "from">, o: RunSelect): Prom
   // backlog of harder ones the run hasn't reached. Read alongside the past attempts.
   const [attempted, reviews] = await Promise.all([
     attemptedPuzzleIds(db, o.userId),
-    loadDueReviews(db, o.userId, { limit: MAX_DUE_REVIEWS, level: o.level, exclude: taken, now: o.now }),
+    loadDueReviews(db, o.userId, { limit: MAX_DUE_REVIEWS, level: o.level, calibration: o.calibration, exclude: taken, now: o.now }),
   ]);
   const ladder = LADDERS[o.mode ?? "survival"];
   const byChunk = placeReviews(reviews, o.level, o.fromChunk, o.chunks, ladder);
@@ -104,7 +107,7 @@ export async function selectRunPuzzles(db: Pick<Db, "from">, o: RunSelect): Prom
     for (const r of chunkReviews) taken.add(r.id);
     const picks = await Promise.all(chunkWeaknesses(o.weaknesses.length, c).map((w) =>
       selectFor(db, o.weaknesses[w], {
-        userId: o.userId, count: PER_WEAKNESS + 1, level: o.level, near: centre, attempted, exclude: taken, random: o.random,
+        userId: o.userId, count: PER_WEAKNESS + 1, level: o.level, calibration: o.calibration, near: centre, attempted, exclude: taken, random: o.random,
       })));
     // Take them in turn from each weakness, so a short list doesn't crowd out the others.
     // The same puzzle can carry two weaknesses' labels: keep it once.

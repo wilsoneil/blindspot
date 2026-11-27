@@ -2,8 +2,8 @@
 // positions before their stored mistakes, for weaknesses Lichess puzzles can't train.
 // Difficulty is approximated by how subtle the best move is (src/lib/analysis/accepted.ts).
 
-import { approxRating } from "../analysis/accepted";
 import type { Db } from "../db";
+import { positionRating, type PositionCalibration } from "./position-rating";
 import type { TrainingPuzzle } from "./select";
 
 const PAGE = 1000;
@@ -35,9 +35,9 @@ export async function attemptedMistakeIds(db: Pick<Db, "from">, userId: string):
 }
 
 /** Turns a stored mistake into a trainable position. */
-export function positionFromMistake(m: MistakeRow, level: number): TrainingPuzzle {
+export function positionFromMistake(m: MistakeRow, level: number, calibration: PositionCalibration | null = null): TrainingPuzzle {
   return {
-    id: `m${m.id}`, fen: m.fen, moves: [], rating: approxRating(level, m.subtlety ?? 0.5), themes: [], labels: m.labels,
+    id: `m${m.id}`, fen: m.fen, moves: [], rating: positionRating(level, m.subtlety, calibration), themes: [], labels: m.labels,
     position: {
       mistakeId: m.id, accepted: m.accepted_moves ?? [], playedSan: m.played_san, playedUci: m.played_uci,
       refutation: (m.refutation ?? "").split(" ").filter(Boolean), bestSan: m.best_san, playedAt: m.played_at,
@@ -51,6 +51,8 @@ export interface PositionSelect {
   labelKeys: string[];
   count: number;
   level: number;
+  /** The fitted own-position rule, once there are enough attempts (position-rating.ts). */
+  calibration?: PositionCalibration | null;
   /** Prefer positions whose stand-in rating is near this (mixed modes); default: random. */
   near?: number;
   /** Ids ("m123") already served in this session. */
@@ -87,7 +89,7 @@ export async function selectPositions(db: Pick<Db, "from">, o: PositionSelect): 
 
   const fresh = rows
     .filter((m) => (m.accepted_moves?.length ?? 0) > 0 && !done.has(m.id) && !exclude.has(`m${m.id}`))
-    .map((m) => ({ p: positionFromMistake(m, o.level), key: random() }));
+    .map((m) => ({ p: positionFromMistake(m, o.level, o.calibration), key: random() }));
   if (o.near !== undefined) {
     const near = o.near;
     fresh.sort((a, b) => Math.abs(a.p.rating - near) - Math.abs(b.p.rating - near) || a.key - b.key);

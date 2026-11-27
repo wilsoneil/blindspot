@@ -95,14 +95,19 @@ export interface RatedAttempt {
   fullySolved: boolean;
 }
 
-/** The rating after each attempt in turn (each attempt is its own rating period, as on Lichess). */
+/** The rating after one attempt (its own rating period, as on Lichess). */
+export function rateAttempt(r: Glicko, a: RatedAttempt): Glicko {
+  const next = glicko2(r, [{ rating: a.puzzleRating, rd: PUZZLE_RD, score: a.fullySolved ? 1 : 0 }]);
+  // Never rises on a failed or slow puzzle (guards against rounding), and RD has a floor.
+  return { rating: a.fullySolved ? next.rating : Math.min(next.rating, r.rating), rd: Math.max(MIN_RD, next.rd), vol: next.vol };
+}
+
+/** The rating after each attempt in turn. */
 export function replay(attempts: RatedAttempt[], start: Glicko = START): Glicko[] {
   const out: Glicko[] = [];
   let r = start;
   for (const a of attempts) {
-    const next = glicko2(r, [{ rating: a.puzzleRating, rd: PUZZLE_RD, score: a.fullySolved ? 1 : 0 }]);
-    // Never rises on a failed or slow puzzle (guards against rounding), and RD has a floor.
-    r = { rating: a.fullySolved ? next.rating : Math.min(next.rating, r.rating), rd: Math.max(MIN_RD, next.rd), vol: next.vol };
+    r = rateAttempt(r, a);
     out.push(r);
   }
   return out;
