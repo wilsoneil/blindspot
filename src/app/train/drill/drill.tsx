@@ -117,8 +117,8 @@ export function Drill({ weaknessKey, profileKey, initial, engineDefault }: {
       {result && (
         <div className="save-bar" style={{ marginTop: "0.75rem", flexWrap: "wrap" }}>
           <button type="button" className="button" onClick={next}>Next puzzle</button>
-          {/* Only after a miss (a wrong move or a reveal), and not once the analysis has shown the answer. */}
-          {!result.correct && !analysed && (
+          {/* Only after a wrong move, and not once the answer has been seen (shown solution or analysis). */}
+          {!result.correct && !result.revealed && !analysed && (
             <button type="button" className="link-button" onClick={() => { reset(); setRound((n) => n + 1); }}>Try again</button>
           )}
           <button type="button" className="link-button" onClick={() => { setAnalysed(true); setAnalysing((a) => !a); }}>
