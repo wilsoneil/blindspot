@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { describeKey } from "@/lib/analysis/profile";
 import { getAppContext } from "@/lib/app-data";
 import { clientPuzzle } from "@/lib/training/client-puzzle";
-import { puzzleLevel } from "@/lib/training/rating";
+import { trainingLevel } from "@/lib/training/position-rating";
 import { attemptedPuzzleIds, trainingSource } from "@/lib/training/select";
 import { selectFor, weaknessFromKey } from "@/lib/training/sources";
 import { profileKeyForSetting } from "@/lib/weakness-store";
@@ -39,8 +39,10 @@ export default async function DrillPage({ searchParams }: PageProps<"/train/dril
   }
 
   // The Blindspot rating and the puzzles already seen, read together.
-  const [level, attempted] = await Promise.all([puzzleLevel(ctx.db, ctx.userId), attemptedPuzzleIds(ctx.db, ctx.userId)]);
-  const puzzles = await selectFor(ctx.db, weakness, { userId: ctx.userId, count: 5, level, attempted });
+  const [{ level, calibration }, attempted] = await Promise.all([
+    trainingLevel(ctx.db, ctx.userId), attemptedPuzzleIds(ctx.db, ctx.userId),
+  ]);
+  const puzzles = await selectFor(ctx.db, weakness, { userId: ctx.userId, count: 5, level, calibration, attempted });
   const own = weakness.kind === "ownGames";
   return (
     <section className="card">

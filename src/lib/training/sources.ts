@@ -13,6 +13,7 @@
 import type { Db } from "../db";
 import { labelForKey } from "../labels";
 import { openingCandidates } from "./openings";
+import type { PositionCalibration } from "./position-rating";
 import { selectPositions } from "./positions";
 import { attemptedPuzzleIds, selectPuzzles, trainingSource, type TrainingPuzzle } from "./select";
 
@@ -47,6 +48,8 @@ export interface ItemSelect {
   userId: string;
   count: number;
   level: number;
+  /** The fitted own-position rule, if any (position-rating.ts). */
+  calibration?: PositionCalibration | null;
   /** Aim at this rating instead of the level (the mixed modes' ladder). */
   near?: number;
   attempted?: Set<string>;
@@ -79,7 +82,7 @@ export async function selectFor(db: Pick<Db, "from">, w: Weakness, o: ItemSelect
     if (!w.ownLabelKeys) return puzzlesFor(o.count);
     // Half own positions (rounded up), the rest puzzles, alternating own / puzzle.
     const own = await selectPositions(db, {
-      userId: o.userId, labelKeys: w.ownLabelKeys, count: Math.ceil(o.count / 2), level: o.level, near: o.near,
+      userId: o.userId, labelKeys: w.ownLabelKeys, count: Math.ceil(o.count / 2), level: o.level, calibration: o.calibration, near: o.near,
       exclude: o.exclude, random: o.random,
     });
     const puzzles = await puzzlesFor(o.count - own.length);
@@ -87,14 +90,14 @@ export async function selectFor(db: Pick<Db, "from">, w: Weakness, o: ItemSelect
     const short = o.count - own.length - puzzles.length;
     const more = short > 0
       ? await selectPositions(db, {
-        userId: o.userId, labelKeys: w.ownLabelKeys, count: short, level: o.level, near: o.near,
+        userId: o.userId, labelKeys: w.ownLabelKeys, count: short, level: o.level, calibration: o.calibration, near: o.near,
         exclude: [...(o.exclude ?? []), ...own.map((p) => p.id)], random: o.random,
       })
       : [];
     return [...alternate(own, puzzles), ...more];
   }
   return selectPositions(db, {
-    userId: o.userId, labelKeys: w.labelKeys, count: o.count, level: o.level, near: o.near, exclude: o.exclude, random: o.random,
+    userId: o.userId, labelKeys: w.labelKeys, count: o.count, level: o.level, calibration: o.calibration, near: o.near, exclude: o.exclude, random: o.random,
   });
 }
 

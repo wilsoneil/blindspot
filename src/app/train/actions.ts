@@ -11,6 +11,7 @@ import { getDb, type Db } from "@/lib/db";
 import { settingsFromRow, type Settings, type SettingsRow } from "@/lib/settings";
 import { AttemptError, recordPuzzleAttempt, type AttemptInput, type AttemptOutcome } from "@/lib/training/attempts";
 import { clientPuzzle, type ClientPuzzle } from "@/lib/training/client-puzzle";
+import { trainingLevel } from "@/lib/training/position-rating";
 import { puzzleLevel } from "@/lib/training/rating";
 import { selectRunPuzzles, type RunMode } from "@/lib/training/run";
 import { selectFor, weaknessFromKey } from "@/lib/training/sources";
@@ -66,8 +67,8 @@ export async function morePuzzles(weaknessKey: string, exclude: string[]): Promi
     if (!ctx) return { ok: false, message: "Please sign in again." };
     const [weakness] = weaknessesOf([weaknessKey]);
     if (!weakness) return { ok: false, message: "This weakness can't be trained yet." };
-    const level = await puzzleLevel(ctx.db, ctx.userId);
-    const puzzles = await selectFor(ctx.db, weakness, { userId: ctx.userId, level, exclude: exclude.slice(0, 500), count: 5 });
+    const { level, calibration } = await trainingLevel(ctx.db, ctx.userId);
+    const puzzles = await selectFor(ctx.db, weakness, { userId: ctx.userId, level, calibration, exclude: exclude.slice(0, 500), count: 5 });
     return { ok: true, value: puzzles.map((p) => clientPuzzle(p, ctx.settings, level)) };
   } catch (e) {
     console.error("Loading puzzles failed", e);
@@ -83,9 +84,9 @@ export async function moreRunPuzzles(
     const ctx = await signedIn();
     if (!ctx) return { ok: false, message: "Please sign in again." };
     const weaknesses = weaknessesOf(weaknessKeys);
-    const level = await puzzleLevel(ctx.db, ctx.userId);
+    const { level, calibration } = await trainingLevel(ctx.db, ctx.userId);
     const puzzles = await selectRunPuzzles(ctx.db, {
-      userId: ctx.userId, weaknesses, level, mode: mode === "rush" ? "rush" : "survival", fromChunk: Math.max(0, Math.floor(fromChunk)), chunks: 2,
+      userId: ctx.userId, weaknesses, level, calibration, mode: mode === "rush" ? "rush" : "survival", fromChunk: Math.max(0, Math.floor(fromChunk)), chunks: 2,
       exclude: exclude.slice(0, 1000),
     });
     return { ok: true, value: puzzles.map((p) => clientPuzzle(p, ctx.settings, level)) };

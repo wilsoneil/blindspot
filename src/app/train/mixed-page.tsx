@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAppContext } from "@/lib/app-data";
 import { clientPuzzle } from "@/lib/training/client-puzzle";
-import { puzzleLevel } from "@/lib/training/rating";
+import { trainingLevel } from "@/lib/training/position-rating";
 import { runStats } from "@/lib/training/stats";
 import { mixedWeaknesses, selectRunPuzzles, shuffled } from "@/lib/training/run";
 import { describeProfileKey, loadProfiles, profileKeyForSetting } from "@/lib/weakness-store";
@@ -33,8 +33,8 @@ export async function MixedModePage({ mode, tc }: { mode: "rush" | "survival"; t
 
   const profileKey = tc?.slice(0, 40) ?? profileKeyForSetting(ctx.settings.focusTimeControl);
   // Read together: they don't depend on each other.
-  const [profiles, level, stats] = await Promise.all([
-    loadProfiles(ctx.db, ctx.userId), puzzleLevel(ctx.db, ctx.userId), runStats(ctx.db, ctx.userId, mode),
+  const [profiles, { level, calibration }, stats] = await Promise.all([
+    loadProfiles(ctx.db, ctx.userId), trainingLevel(ctx.db, ctx.userId), runStats(ctx.db, ctx.userId, mode),
   ]);
   const profile = profiles.find((p) => p.profileKey === profileKey);
   const weaknesses = shuffled(mixedWeaknesses(profile?.top ?? [], ctx.settings.weaknessesShown));
@@ -51,7 +51,7 @@ export async function MixedModePage({ mode, tc }: { mode: "rush" | "survival"; t
     );
   }
 
-  const puzzles = await selectRunPuzzles(ctx.db, { userId: ctx.userId, weaknesses, level, mode, fromChunk: 0, chunks: 2 });
+  const puzzles = await selectRunPuzzles(ctx.db, { userId: ctx.userId, weaknesses, level, calibration, mode, fromChunk: 0, chunks: 2 });
   return (
     <section className="card">
       <h1>{title} <span className="pill">{describeProfileKey(profileKey)}</span></h1>
