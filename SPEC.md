@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 27 Nov 2026 (Survival: gentler ladder)
+Last updated: 27 Nov 2026 (Blitz gap leads the home page; Blindspot rating moved to Settings)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -146,7 +146,7 @@ Every attempt logs the result and the time taken; both feed the weakness score a
 
 ## Progress and headline metrics
 
-The home screen leads with the Blindspot rating as the primary number, in a compact card (the number on the left, a small line chart on the right with week / month / all-time tabs), so the top weaknesses are visible straight away beneath it; the Blitz gap has the same compact card below the weaknesses. The rating is marked "provisional" while its Glicko-2 deviation is above 90 (twice the floor), and each chart shows the change over the chosen period.
+The home screen leads with the Blitz gap, the measure of real progress, in a compact card (the number on the left, a small line chart on the right with week / month / all-time tabs), so the top weaknesses are visible straight away beneath it. The Blindspot rating has the same compact card on the settings page: it sets puzzle difficulty and shows training progress, but it is only comparable with itself (weakness themes only, solves within target time), so it is not a headline. The rating is marked "provisional" while its Glicko-2 deviation is above 90 (twice the floor), and each chart shows the change over the chosen period.
 
 - **Blindspot rating:** one overall Glicko-2 rating across all rated Lichess puzzles attempted in the app (first attempts only). It only rises for solves that are correct and within target time. Each attempt is its own rating period against the puzzle's Lichess rating at the time (with a fixed deviation of 80, since stored puzzles have settled ratings); it starts at 1500 (deviation 350, volatility 0.06, τ 0.5) and the deviation never drops below 45, so it keeps responding. It is worked out by replaying the first attempts in order, so its full history can always be rebuilt. Puzzles are chosen around it, and it sets the "well above the user's level" part of the target time.
 - **Blitz gap:** daily rating minus blitz rating, from chess.com ratings fetched daily and smoothed as a 30-day average so a single bad session doesn't swing it. Shown in points, with the change over the chosen period beneath it (green when it falls, which means the gap is closing). Show both underlying ratings in small print. The history also uses the rating saved with every imported game (chess.com's rating after that game), so the chart covers the whole import from the start; each day takes the latest rating for each time control, carried forward over days without games. The import job works the gap out once a day after importing and stores it (`blitz_gaps`, migration 0008), so the home page reads one row instead of every game's rating; until it has, the page works it out live.

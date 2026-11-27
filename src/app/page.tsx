@@ -7,7 +7,6 @@ import { SMOOTHING_DAYS } from "@/lib/progress/blitz-gap";
 import { loadBlitzGap } from "@/lib/progress/blitz-gap-store";
 import { chartSeries } from "@/lib/progress/series";
 import { themeRating, type ThemeAttempt, type ThemeRating } from "@/lib/progress/theme-ratings";
-import { MIN_RD, replay } from "@/lib/training/rating";
 import { loadStatus } from "@/lib/data-status";
 import {
   describeProfileKey, loadProfiles, loadWeaknessTrends, profileKeyForSetting,
@@ -42,7 +41,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
 
   return (
     <>
-      <RatingCard rating={ratingFrom(attempts)} />
+      {settings.chesscomUsername && <BlitzGapCard gap={gap} />}
 
       {!settings.chesscomUsername && (
         <section className="card notice">
@@ -83,8 +82,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         )}
       </section>
 
-      {settings.chesscomUsername && <BlitzGapCard gap={gap} />}
-
       {s.waiting > 0 && (
         <section className="card">
           <h2>Analysis</h2>
@@ -102,39 +99,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   );
 }
 
-/** The Blindspot rating and its chart series, replayed from the rated first attempts (Lichess puzzles only). */
-function ratingFrom({ attempts, now }: Awaited<ReturnType<typeof loadAttempts>>) {
-  const rated = attempts.filter((a) => a.puzzleRating !== null);
-  const history = replay(rated.map((a) => ({ puzzleRating: a.puzzleRating!, fullySolved: a.fullySolved })));
-  const points = history.map((h, i) => ({ t: rated[i].at, v: Math.round(h.rating) }));
-  return { last: history.at(-1), count: history.length, series: chartSeries(points, now) };
-}
-
-/** The home page's headline number. */
-function RatingCard({ rating }: { rating: ReturnType<typeof ratingFrom> }) {
-  const { last, count, series } = rating;
-  if (!last) {
-    return (
-      <section className="card compact-card">
-        <div className="headline-label">Blindspot rating</div>
-        <p className="small muted" style={{ margin: "0.25rem 0 0" }}>
-          Your rating appears after your first puzzles in Drill, Rush or Survival.
-        </p>
-      </section>
-    );
-  }
-  // Glicko-2 is unsure of a new rating; say so until it has settled a little.
-  const provisional = last.rd > 2 * MIN_RD;
-  return (
-    <section className="card compact-card">
-      <CompactTrend
-        title={<>Blindspot rating <span className="muted">· {count.toLocaleString()} puzzle{count === 1 ? "" : "s"}</span></>}
-        value={<>{Math.round(last.rating)}{provisional && <span className="small muted" style={{ fontWeight: 400 }}> provisional</span>}</>}
-        series={series} label="Blindspot rating" />
-    </section>
-  );
-}
-
 const PAGE = 1000;
 
 /** The Blitz gap (stored daily by the import job) with its chart series. */
@@ -143,7 +107,7 @@ async function loadGap(db: Db, userId: string) {
   return gap && { ...gap, chart: chartSeries(gap.series, Date.now()) };
 }
 
-/** The Blitz gap, below the top weaknesses (SPEC.md -> "Progress and headline metrics"). */
+/** The Blitz gap, the home page's headline (SPEC.md -> "Progress and headline metrics"). */
 function BlitzGapCard({ gap }: { gap: Awaited<ReturnType<typeof loadGap>> }) {
   if (!gap) {
     return (
@@ -166,10 +130,7 @@ function BlitzGapCard({ gap }: { gap: Awaited<ReturnType<typeof loadGap>> }) {
   );
 }
 
-/**
- * Every first attempt, oldest first, read once for both the Blindspot rating (Lichess puzzles)
- * and the rating per weakness theme (which also counts own-game positions).
- */
+/** Every first attempt, oldest first, for the rating per weakness theme (Lichess puzzles and own-game positions). */
 async function loadAttempts(db: Db, userId: string) {
   const attempts: ThemeAttempt[] = [];
   for (let from = 0; ; from += PAGE) {
