@@ -64,11 +64,11 @@ describe("reviews in Rush and Survival", () => {
   const puzzle = (id: string, labels: string[], rating = 1500) => ({
     id, fen: "8/8/8/8/8/8/8/8 w - - 0 1", moves: "a2a3 a7a6", rating, themes: [], labels,
   });
-  // Plenty of new puzzles across the ladder, and four earlier misses (three due) at 1250, 1600, 1900, 1500.
+  // Plenty of new puzzles across the ladder, and four earlier misses (three due) at 1040, 1220, 1400, 1300.
   const puzzles = [
     ...Array.from({ length: 60 }, (_, i) => puzzle(`f${i}`, ["fork"], 1000 + 20 * i)),
     ...Array.from({ length: 60 }, (_, i) => puzzle(`p${i}`, ["pin"], 1000 + 20 * i)),
-    puzzle("old1", ["skewer"], 1250), puzzle("old2", ["skewer"], 1600), puzzle("old3", ["fork"], 1900), puzzle("old4", ["pin"], 1500),
+    puzzle("old1", ["skewer"], 1040), puzzle("old2", ["skewer"], 1220), puzzle("old3", ["fork"], 1400), puzzle("old4", ["pin"], 1300),
   ];
   const queue = ["old1", "old2", "old3", "old4"].map((id, i) => ({
     id: i + 1, user_id: "u1", puzzle_id: id, mistake_id: null, step: 0, due_at: days(i < 3 ? -1 : 2).toISOString(),
@@ -95,8 +95,8 @@ describe("reviews in Rush and Survival", () => {
   it("places each review in the group matching its difficulty, keeping the group easiest first", async () => {
     const got = await run({ chunks: 5 });
     const chunkOf = (id: string) => Math.floor(got.findIndex((p) => p.id === id) / CHUNK);
-    // Groups centre on 1262, 1412, 1562, 1712, 1862: old1 (1250) fits the first, old2 (1600)
-    // the third, old3 (1900) the fifth.
+    // Survival's groups centre on about 1038, 1128, 1218, 1308, 1398: old1 (1040) fits the
+    // first, old2 (1220) the third, old3 (1400) the fifth.
     expect(chunkOf("old1")).toBe(0);
     expect(chunkOf("old2")).toBe(2);
     expect(chunkOf("old3")).toBe(4);
@@ -119,7 +119,7 @@ describe("reviews in Rush and Survival", () => {
 
   it("still finds an easier due review behind a backlog of older, harder ones", async () => {
     const hard = Array.from({ length: 30 }, (_, i) => puzzle(`hard${i}`, ["skewer"], 2400));
-    const easy = puzzle("easy", ["skewer"], 1250);
+    const easy = puzzle("easy", ["skewer"], 1040);
     const backlog = [...hard, easy].map((p, i) => ({
       id: 100 + i, user_id: "u1", puzzle_id: p.id, mistake_id: null, step: 0, due_at: days(-40 + i).toISOString(),
     }));
