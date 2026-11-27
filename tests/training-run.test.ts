@@ -20,10 +20,10 @@ function store(labels: string[]) {
 }
 
 describe("the ladder", () => {
-  it("Survival starts 300 below the user's level and rises 25 per puzzle", () => {
-    expect(ladderRating(1500, 0)).toBe(1200);
-    expect(ladderRating(1500, 12)).toBe(1500);
-    expect(ladderRating(1500, 20)).toBe(1700);
+  it("Survival starts 500 below the user's level and rises 15 per puzzle", () => {
+    expect(ladderRating(1500, 0)).toBe(1000);
+    expect(ladderRating(1500, 20)).toBe(1300);
+    expect(ladderRating(1500, 40)).toBe(1600);
   });
 
   it("Rush starts 600 below and rises 10 per puzzle", () => {
