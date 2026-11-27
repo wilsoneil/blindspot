@@ -353,14 +353,15 @@ ol.weaknesses {
 .check-table th { color: var(--muted); font-weight: 600; white-space: nowrap; }
 
 /* Headline cards on the home page (src/app/trend-chart.tsx): number left, small chart right. */
-.headline-label { color: var(--muted); font-size: 0.8rem; }
+.headline-label { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
 .card.compact-card { padding: 0.65rem 0.9rem; }
 .compact-main { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
-.compact-left { min-width: 0; }
+/* The left side keeps its label on one line; the chart gives up the width. */
+.compact-left { flex: 0 0 auto; }
 .compact-value { font-size: 1.6rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .compact-left .good { color: var(--good); }
 .compact-left .bad { color: var(--bad); }
-.compact-right { flex: 0 1 45%; max-width: 180px; display: flex; flex-direction: column; align-items: flex-end; gap: 0.15rem; }
+.compact-right { flex: 1 1 0; min-width: 80px; max-width: 180px; display: flex; flex-direction: column; align-items: flex-end; gap: 0.15rem; }
 .mini-chart { display: block; width: 100%; height: 44px; }
 .mini-empty { display: flex; align-items: center; justify-content: flex-end; }
 .mini-tabs { display: inline-flex; gap: 0.15rem; }
