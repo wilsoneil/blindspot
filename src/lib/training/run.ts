@@ -16,10 +16,10 @@ import { selectFor, weaknessFromKey, type Weakness } from "./sources";
 
 export type RunMode = "rush" | "survival";
 export interface Ladder { start: number; step: number }
-/** Rush trains speed: easy at first, climbing slowly. Survival tests the limit. */
+/** Rush trains speed: easy at first, climbing slowly. Survival climbs faster, reaching the user's level after about 33 puzzles. */
 export const LADDERS: Record<RunMode, Ladder> = {
   rush: { start: -600, step: 10 },
-  survival: { start: -300, step: 25 },
+  survival: { start: -500, step: 15 },
 };
 export const CHUNK = 6;
 const PER_WEAKNESS = 2;
