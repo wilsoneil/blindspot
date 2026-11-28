@@ -37,7 +37,13 @@ function legalDests(chess: Chess): Map<Square, Square[]> {
   return out;
 }
 
-function tryMove(chess: Chess, uci: Uci) {
+/** Whether moving from `from` to `to` is a pawn reaching the last rank (so a piece must be chosen). */
+function isPromotion(chess: Chess, from: Square, to: Square): boolean {
+  return chess.get(from)?.type === "p" && (to[1] === "8" || to[1] === "1");
+}
+
+/** Plays a UCI move, or returns null if it is illegal. */
+export function tryMove(chess: Chess, uci: Uci) {
   try {
     return chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
   } catch {
@@ -75,7 +81,7 @@ export class FindMoveRun implements BoardRun {
   }
 
   isPromotion(from: Square, to: Square) {
-    return this.chess.get(from)?.type === "p" && (to[1] === "8" || to[1] === "1");
+    return isPromotion(this.chess, from, to);
   }
 
   play(uci: Uci): MoveResult {
@@ -104,7 +110,7 @@ export class PuzzleRun implements BoardRun {
   constructor(fen: string, private readonly moves: Uci[]) {
     if (moves.length < 2 || moves.length % 2 !== 0) throw new Error("A puzzle needs a setup move and a solution ending on the user's move.");
     this.chess = new Chess(fen);
-    const setup = this.apply(moves[0]);
+    const setup = tryMove(this.chess, moves[0]);
     if (!setup) throw new Error(`The puzzle's setup move ${moves[0]} is illegal.`);
     this.userColor = this.chess.turn() === "w" ? "white" : "black";
     this.userMoves = moves.length / 2;
@@ -128,17 +134,15 @@ export class PuzzleRun implements BoardRun {
     return this.done ? new Map<Square, Square[]>() : legalDests(this.chess);
   }
 
-  /** Whether moving from `from` to `to` is a pawn reaching the last rank (so a piece must be chosen). */
   isPromotion(from: Square, to: Square): boolean {
-    const piece = this.chess.get(from);
-    return piece?.type === "p" && (to[1] === "8" || to[1] === "1");
+    return isPromotion(this.chess, from, to);
   }
 
   /** The user plays a move. */
   play(uci: Uci): MoveResult {
     if (this.done) return { result: "illegal" };
     const expected = this.moves[this.next];
-    const move = this.apply(uci);
+    const move = tryMove(this.chess, uci);
     if (!move) return { result: "illegal" };
     if (this.chess.isCheckmate()) {
       this.done = true;
@@ -153,7 +157,7 @@ export class PuzzleRun implements BoardRun {
       return { result: "solved" };
     }
     const reply = this.moves[this.next + 1];
-    this.apply(reply);
+    tryMove(this.chess, reply);
     this.next += 2;
     return { result: "correct", reply };
   }
@@ -161,10 +165,6 @@ export class PuzzleRun implements BoardRun {
   /** The move the solution expects next (for "reveal solution" and hints). */
   expectedMove(): Uci | null {
     return this.done ? null : this.moves[this.next];
-  }
-
-  private apply(uci: Uci) {
-    return tryMove(this.chess, uci);
   }
 }
 
@@ -177,4 +177,13 @@ const TARGET_FACTOR: Record<TargetTime, number> = { stricter: 0.75, normal: 1, l
 export function targetTimeMs(o: { userMoves: number; puzzleRating: number; level: number; setting: TargetTime }): number {
   const hard = o.puzzleRating >= o.level + HARD_PUZZLE_GAP ? 1.5 : 1;
   return Math.round(MS_PER_MOVE * o.userMoves * hard * TARGET_FACTOR[o.setting]);
+}
+
+/**
+ * The target time for a Lichess puzzle (`rating` set) or an own position (`rating` null: one
+ * move, and no "well above your level" extra time). Shared by the server, which records it,
+ * and the browser, which shows it.
+ */
+export function itemTargetMs(item: { userMoves: number; rating: number | null }, level: number, setting: TargetTime): number {
+  return targetTimeMs({ userMoves: item.userMoves, puzzleRating: item.rating ?? level, level, setting });
 }

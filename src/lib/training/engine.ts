@@ -3,6 +3,7 @@
 // in a Web Worker (public/stockfish/), started by the analysis board.
 
 import { Chess } from "chess.js";
+import { tryMove } from "./play";
 
 export type Score = { cp: number } | { mate: number };
 
@@ -52,12 +53,9 @@ export function pvToSan(fen: string, pv: string[], max = 5): string {
   for (const uci of pv.slice(0, max)) {
     const white = chess.turn() === "w";
     const n = chess.moveNumber();
-    let san: string;
-    try {
-      san = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] }).san;
-    } catch {
-      break;
-    }
+    const move = tryMove(chess, uci);
+    if (!move) break;
+    const san = move.san;
     if (white) parts.push(`${n}. ${san}`);
     else parts.push(parts.length === 0 ? `${n}… ${san}` : san);
   }

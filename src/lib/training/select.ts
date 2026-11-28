@@ -8,6 +8,7 @@
 
 import type { Db } from "../db";
 import { labelForKey, puzzleLabelForKey } from "../labels";
+import { readAll } from "../read-all";
 
 /** Where a weakness's training positions come from. */
 export type TrainingSource =
@@ -34,7 +35,6 @@ export const RATING_WINDOWS = [100, 200, 400, Infinity];
 
 const SLICE = 200; // candidate rows read per query
 const SLICES_PER_WINDOW = 3;
-const PAGE = 1000;
 
 export interface TrainingPuzzle {
   id: string;
@@ -60,13 +60,20 @@ export interface PositionDetails {
   playedAt: string;
 }
 
-interface PuzzleDbRow {
+export interface PuzzleDbRow {
   id: string;
   fen: string;
   moves: string;
   rating: number;
   themes: string[];
   labels: string[];
+}
+
+/** The puzzle columns a TrainingPuzzle is built from. */
+export const PUZZLE_COLUMNS = "id, fen, moves, rating, themes, labels";
+
+export function puzzleFromRow(r: PuzzleDbRow): TrainingPuzzle {
+  return { id: r.id, fen: r.fen, moves: r.moves.split(" ").filter(Boolean), rating: r.rating, themes: r.themes, labels: r.labels };
 }
 
 export interface SelectOptions {
@@ -86,18 +93,19 @@ export interface SelectOptions {
   random?: () => number;
 }
 
-/** Puzzle ids the user has already attempted (any mode). */
-export async function attemptedPuzzleIds(db: Pick<Db, "from">, userId: string): Promise<Set<string>> {
-  const ids = new Set<string>();
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await db.from("puzzle_attempts")
-      .select("puzzle_id").eq("user_id", userId).not("puzzle_id", "is", null)
-      .order("id").range(from, from + PAGE - 1);
-    if (error) throw new Error(`Could not read past attempts: ${error.message}`);
-    for (const row of data as { puzzle_id: string }[]) ids.add(row.puzzle_id);
-    if (data.length < PAGE) return ids;
-  }
+/** The ids in one column of the user's attempts (any mode). */
+async function attemptedIds<T>(db: Pick<Db, "from">, userId: string, column: "puzzle_id" | "mistake_id"): Promise<Set<T>> {
+  const rows = await readAll<Record<string, T>>((from, to) =>
+    db.from("puzzle_attempts").select(column).eq("user_id", userId).not(column, "is", null)
+      .order("id").range(from, to), "read past attempts");
+  return new Set(rows.map((r) => r[column]));
 }
+
+/** Puzzle ids the user has already attempted (any mode). */
+export const attemptedPuzzleIds = (db: Pick<Db, "from">, userId: string) => attemptedIds<string>(db, userId, "puzzle_id");
+
+/** Mistake ids the user has already trained as own positions. */
+export const attemptedMistakeIds = (db: Pick<Db, "from">, userId: string) => attemptedIds<number>(db, userId, "mistake_id");
 
 /**
  * Unseen puzzles carrying all the given labels, as close to the user's level as possible:
@@ -131,7 +139,7 @@ export async function selectPuzzles(db: Pick<Db, "from">, o: SelectOptions): Pro
     let cursor: string | null = null;
     let wrapped = false;
     for (let i = 0; i < SLICES_PER_WINDOW; i++) {
-      let q = inWindow(db.from("puzzles").select("id, fen, moves, rating, themes, labels"));
+      let q = inWindow(db.from("puzzles").select(PUZZLE_COLUMNS));
       if (cursor !== null) q = q.gt("id", cursor);
       q = wrapped ? q.lt("id", start) : cursor === null ? q.gte("id", start) : q;
       const { data, error: readErr } = await q.order("id").limit(SLICE);
@@ -150,9 +158,7 @@ export async function selectPuzzles(db: Pick<Db, "from">, o: SelectOptions): Pro
     if (pool.size >= o.count) break;
   }
 
-  return shuffle([...pool.values()], random).slice(0, o.count).map((r) => ({
-    id: r.id, fen: r.fen, moves: r.moves.split(" ").filter(Boolean), rating: r.rating, themes: r.themes, labels: r.labels,
-  }));
+  return shuffled([...pool.values()], random).slice(0, o.count).map(puzzleFromRow);
 }
 
 const ID_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -162,10 +168,12 @@ export function randomId(random: () => number): string {
   return Array.from({ length: 5 }, () => ID_CHARS[Math.floor(random() * ID_CHARS.length) % ID_CHARS.length]).join("");
 }
 
-function shuffle<T>(items: T[], random: () => number): T[] {
-  for (let i = items.length - 1; i > 0; i--) {
+/** Shuffles a copy (Fisher-Yates). */
+export function shuffled<T>(items: T[], random: () => number = Math.random): T[] {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
-    [items[i], items[j]] = [items[j], items[i]];
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  return items;
+  return a;
 }

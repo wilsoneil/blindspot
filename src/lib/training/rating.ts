@@ -8,6 +8,7 @@
 // and the history for the Phase 4 charts can be rebuilt the same way.
 
 import type { Db } from "../db";
+import { readAll } from "../read-all";
 
 export interface Glicko {
   rating: number;
@@ -25,6 +26,13 @@ export const PUZZLE_RD = 80;
 
 const SCALE = 173.7178;
 
+/** Glicko-2's g(φ): how much an opponent's rating deviation flattens the expected score. */
+const g = (phi: number) => 1 / Math.sqrt(1 + (3 * phi * phi) / (Math.PI * Math.PI));
+/** g for a puzzle (deviation PUZZLE_RD). */
+const PUZZLE_G = g(PUZZLE_RD / SCALE);
+/** The slope of the expected score against a puzzle, per rating point (used by position-rating.ts). */
+export const PUZZLE_SLOPE = PUZZLE_G / SCALE;
+
 /**
  * One Glicko-2 rating period against some opponents (Glickman, "Example of the Glicko-2
  * system", 2013). score: 1 = win, 0 = loss.
@@ -36,7 +44,6 @@ export function glicko2(player: Glicko, games: { rating: number; rd: number; sco
     const phiStar = Math.sqrt(phi * phi + player.vol * player.vol);
     return { rating: player.rating, rd: Math.min(START.rd, phiStar * SCALE), vol: player.vol };
   }
-  const g = (p: number) => 1 / Math.sqrt(1 + (3 * p * p) / (Math.PI * Math.PI));
   const opp = games.map((o) => {
     const muJ = (o.rating - 1500) / SCALE;
     const gJ = g(o.rd / SCALE);
@@ -84,9 +91,12 @@ export function glicko2(player: Glicko, games: { rating: number; rd: number; sco
 
 /** The chance of solving a puzzle at a given rating (the Glicko-2 expected score). */
 export function expectedScore(rating: number, puzzleRating: number): number {
-  const phi = PUZZLE_RD / SCALE;
-  const g = 1 / Math.sqrt(1 + (3 * phi * phi) / (Math.PI * Math.PI));
-  return 1 / (1 + Math.exp((-g * (rating - puzzleRating)) / SCALE));
+  return 1 / (1 + Math.exp((-PUZZLE_G * (rating - puzzleRating)) / SCALE));
+}
+
+/** An attempt counts as a win only when it was correct within its target time. */
+export function isFullySolved(a: { correct: boolean; solve_ms: number; target_ms: number }): boolean {
+  return a.correct && a.solve_ms <= a.target_ms;
 }
 
 export interface RatedAttempt {
@@ -113,27 +123,19 @@ export function replay(attempts: RatedAttempt[], start: Glicko = START): Glicko[
   return out;
 }
 
-const PAGE = 1000;
-
 /** The user's rated first attempts, oldest first. */
-export async function loadRatedAttempts(db: Pick<Db, "from">, userId: string): Promise<RatedAttempt[]> {
-  const out: RatedAttempt[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await db.from("puzzle_attempts")
+async function loadRatedAttempts(db: Pick<Db, "from">, userId: string): Promise<RatedAttempt[]> {
+  const rows = await readAll<{ puzzle_rating: number; correct: boolean; solve_ms: number; target_ms: number }>((from, to) =>
+    db.from("puzzle_attempts")
       .select("puzzle_rating, correct, solve_ms, target_ms")
       .eq("user_id", userId).eq("first_attempt", true).not("puzzle_id", "is", null)
-      .order("id").range(from, from + PAGE - 1);
-    if (error) throw new Error(`Could not read attempts for the rating: ${error.message}`);
-    const rows = data as { puzzle_rating: number; correct: boolean; solve_ms: number; target_ms: number }[];
-    for (const r of rows) out.push({ puzzleRating: r.puzzle_rating, fullySolved: r.correct && r.solve_ms <= r.target_ms });
-    if (rows.length < PAGE) return out;
-  }
+      .order("id").range(from, to), "read attempts for the rating");
+  return rows.map((r) => ({ puzzleRating: r.puzzle_rating, fullySolved: isFullySolved(r) }));
 }
 
 /** The user's current Blindspot rating. */
 export async function currentRating(db: Pick<Db, "from">, userId: string): Promise<Glicko> {
-  const history = replay(await loadRatedAttempts(db, userId));
-  return history.at(-1) ?? START;
+  return (await loadRatedAttempts(db, userId)).reduce(rateAttempt, START);
 }
 
 /** The level puzzles are chosen around: the rating, rounded. */

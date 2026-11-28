@@ -9,9 +9,9 @@
 
 import type { Db } from "../db";
 import type { PositionCalibration } from "./position-rating";
-import { positionFromMistake } from "./positions";
-import { dueReviews } from "./review";
-import { attemptedPuzzleIds, type TrainingPuzzle } from "./select";
+import { MISTAKE_COLUMNS, positionFromMistake, type MistakeRow } from "./positions";
+import { dueReviews, type ReviewItem } from "./review";
+import { attemptedMistakeIds, attemptedPuzzleIds, PUZZLE_COLUMNS, puzzleFromRow, type PuzzleDbRow, type TrainingPuzzle } from "./select";
 import { selectFor, weaknessFromKey, type Weakness } from "./sources";
 
 export type RunMode = "rush" | "survival";
@@ -30,33 +30,33 @@ export const MAX_DUE_REVIEWS = 500;
 
 export type RunPuzzle = TrainingPuzzle & { review?: boolean };
 
+/** A review item's id as a run lists it: the puzzle id, or "m<mistake id>" (positions.ts). */
+const itemId = (r: ReviewItem) => ("puzzleId" in r ? r.puzzleId : `m${r.mistakeId}`);
+
 /** Puzzles and own positions due for review now (not already in this run), oldest due first. */
 export async function loadDueReviews(
   db: Pick<Db, "from">, userId: string, o: { limit: number; level: number; calibration?: PositionCalibration | null; exclude?: Set<string>; now?: Date },
 ): Promise<RunPuzzle[]> {
-  const due = (await dueReviews(db, userId, o.limit, o.now))
-    .filter((r) => !o.exclude?.has("puzzleId" in r ? r.puzzleId : `m${r.mistakeId}`));
+  const due = (await dueReviews(db, userId, o.limit, o.now)).filter((r) => !o.exclude?.has(itemId(r)));
   const puzzleIds = due.flatMap((r) => ("puzzleId" in r ? [r.puzzleId] : []));
   const mistakeIds = due.flatMap((r) => ("mistakeId" in r ? [r.mistakeId] : []));
-  const out: RunPuzzle[] = [];
-  const order = new Map(due.map((r, i) => ["puzzleId" in r ? r.puzzleId : `m${r.mistakeId}`, i]));
-  if (puzzleIds.length) {
-    const { data, error } = await db.from("puzzles").select("id, fen, moves, rating, themes, labels").in("id", puzzleIds);
-    if (error) throw new Error(`Could not read review puzzles: ${error.message}`);
-    for (const r of data as { id: string; fen: string; moves: string; rating: number; themes: string[]; labels: string[] }[]) {
-      out.push({ ...r, moves: r.moves.split(" ").filter(Boolean), review: true });
-    }
-  }
-  if (mistakeIds.length) {
-    const { data, error } = await db.from("mistakes")
-      .select("id, fen, labels, accepted_moves, subtlety, played_san, played_uci, refutation, best_san, played_at")
-      .eq("user_id", userId).in("id", mistakeIds);
-    if (error) throw new Error(`Could not read review positions: ${error.message}`);
-    for (const m of data as Parameters<typeof positionFromMistake>[0][]) {
-      if (m.accepted_moves?.length) out.push({ ...positionFromMistake(m, o.level, o.calibration), review: true });
-    }
-  }
-  return out.sort((a, b) => order.get(a.id)! - order.get(b.id)!);
+  const order = new Map(due.map((r, i) => [itemId(r), i]));
+  const [puzzles, positions] = await Promise.all([
+    (async (): Promise<RunPuzzle[]> => {
+      if (!puzzleIds.length) return [];
+      const { data, error } = await db.from("puzzles").select(PUZZLE_COLUMNS).in("id", puzzleIds);
+      if (error) throw new Error(`Could not read review puzzles: ${error.message}`);
+      return (data as PuzzleDbRow[]).map((r) => ({ ...puzzleFromRow(r), review: true }));
+    })(),
+    (async (): Promise<RunPuzzle[]> => {
+      if (!mistakeIds.length) return [];
+      const { data, error } = await db.from("mistakes").select(MISTAKE_COLUMNS).eq("user_id", userId).in("id", mistakeIds);
+      if (error) throw new Error(`Could not read review positions: ${error.message}`);
+      return (data as MistakeRow[]).filter((m) => m.accepted_moves?.length)
+        .map((m) => ({ ...positionFromMistake(m, o.level, o.calibration), review: true }));
+    })(),
+  ]);
+  return [...puzzles, ...positions].sort((a, b) => order.get(a.id)! - order.get(b.id)!);
 }
 
 /** The rating the ladder aims at for puzzle number i (from 0). */
@@ -94,8 +94,9 @@ export async function selectRunPuzzles(db: Pick<Db, "from">, o: RunSelect): Prom
   const taken = new Set(o.exclude ?? []);
   // Every due review, so ones that fit this part of the ladder are found even behind a
   // backlog of harder ones the run hasn't reached. Read alongside the past attempts.
-  const [attempted, reviews] = await Promise.all([
+  const [attempted, attemptedMistakes, reviews] = await Promise.all([
     attemptedPuzzleIds(db, o.userId),
+    attemptedMistakeIds(db, o.userId),
     loadDueReviews(db, o.userId, { limit: MAX_DUE_REVIEWS, level: o.level, calibration: o.calibration, exclude: taken, now: o.now }),
   ]);
   const ladder = LADDERS[o.mode ?? "survival"];
@@ -107,7 +108,7 @@ export async function selectRunPuzzles(db: Pick<Db, "from">, o: RunSelect): Prom
     for (const r of chunkReviews) taken.add(r.id);
     const picks = await Promise.all(chunkWeaknesses(o.weaknesses.length, c).map((w) =>
       selectFor(db, o.weaknesses[w], {
-        userId: o.userId, count: PER_WEAKNESS + 1, level: o.level, calibration: o.calibration, near: centre, attempted, exclude: taken, random: o.random,
+        userId: o.userId, count: PER_WEAKNESS + 1, level: o.level, calibration: o.calibration, near: centre, attempted, attemptedMistakes, exclude: taken, random: o.random,
       })));
     // Take them in turn from each weakness, so a short list doesn't crowd out the others.
     // The same puzzle can carry two weaknesses' labels: keep it once.
@@ -152,16 +153,6 @@ export function placeReviews(
     }
   }
   return out;
-}
-
-/** Shuffles a copy (Fisher-Yates). */
-export function shuffled<T>(items: T[], random: () => number = Math.random): T[] {
-  const a = [...items];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }
 
 /**

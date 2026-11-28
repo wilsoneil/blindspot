@@ -23,9 +23,11 @@ export async function runStats(db: Pick<Db, "from">, userId: string, mode: "rush
 
   const score = new Map(list.map((s) => [s.id, 0]));
   const ids = list.map((s) => s.id);
-  for (let i = 0; i < ids.length; i += 200) {
-    const { data, error: aErr } = await db.from("puzzle_attempts")
-      .select("session_id, correct").eq("user_id", userId).in("session_id", ids.slice(i, i + 200)).limit(20000);
+  const batches = [];
+  for (let i = 0; i < ids.length; i += 200) batches.push(ids.slice(i, i + 200));
+  const results = await Promise.all(batches.map(async (batch) =>
+    db.from("puzzle_attempts").select("session_id, correct").eq("user_id", userId).in("session_id", batch).limit(20000)));
+  for (const { data, error: aErr } of results) {
     if (aErr) throw new Error(`Could not read past runs: ${aErr.message}`);
     for (const a of data as { session_id: number; correct: boolean }[]) {
       if (a.correct) score.set(a.session_id, (score.get(a.session_id) ?? 0) + 1);

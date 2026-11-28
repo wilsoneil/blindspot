@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CHUNK, chunkWeaknesses, LADDERS, ladderRating, mixedWeaknesses, selectRunPuzzles, shuffled } from "../src/lib/training/run";
+import { CHUNK, chunkWeaknesses, LADDERS, ladderRating, mixedWeaknesses, selectRunPuzzles } from "../src/lib/training/run";
+import { shuffled } from "../src/lib/training/select";
 import { fakeDb } from "./fake-db";
 
 /** A weakness trained by Lichess puzzles with one label. */

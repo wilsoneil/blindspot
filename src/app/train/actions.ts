@@ -39,9 +39,8 @@ export async function saveAttempt(input: AttemptInput): Promise<ActionResult<Att
   try {
     const ctx = await signedIn();
     if (!ctx) return { ok: false, message: "Please sign in again." };
-    // The level before this attempt: the one the puzzle was served at.
-    const level = await puzzleLevel(ctx.db, ctx.userId);
-    const value = await recordPuzzleAttempt(ctx.db, ctx.userId, ctx.settings, input, level);
+    // The level before this attempt (the one the puzzle was served at), read alongside the attempt's own reads.
+    const value = await recordPuzzleAttempt(ctx.db, ctx.userId, ctx.settings, input, puzzleLevel(ctx.db, ctx.userId));
     if (value.session.attempted % REBUILD_EVERY === 0) {
       // After the response, so the next puzzle isn't held up. The daily job rebuilds too.
       after(() => rebuildProfiles(ctx.db, ctx.userId, ctx.settings).catch((e) => console.error("Profile rebuild failed", e)));

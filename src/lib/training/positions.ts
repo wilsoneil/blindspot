@@ -3,12 +3,14 @@
 // Difficulty is approximated by how subtle the best move is (src/lib/analysis/accepted.ts).
 
 import type { Db } from "../db";
+import { readAll } from "../read-all";
 import { positionRating, type PositionCalibration } from "./position-rating";
-import type { TrainingPuzzle } from "./select";
+import { attemptedMistakeIds, type TrainingPuzzle } from "./select";
 
-const PAGE = 1000;
+/** The mistake columns a position is built from. */
+export const MISTAKE_COLUMNS = "id, fen, labels, accepted_moves, subtlety, played_san, played_uci, refutation, best_san, played_at";
 
-interface MistakeRow {
+export interface MistakeRow {
   id: number;
   fen: string;
   labels: string[];
@@ -19,19 +21,6 @@ interface MistakeRow {
   refutation: string;
   best_san: string;
   played_at: string;
-}
-
-/** Mistake ids the user has already trained. */
-export async function attemptedMistakeIds(db: Pick<Db, "from">, userId: string): Promise<Set<number>> {
-  const ids = new Set<number>();
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await db.from("puzzle_attempts")
-      .select("mistake_id").eq("user_id", userId).not("mistake_id", "is", null)
-      .order("id").range(from, from + PAGE - 1);
-    if (error) throw new Error(`Could not read past attempts: ${error.message}`);
-    for (const row of data as { mistake_id: number }[]) ids.add(row.mistake_id);
-    if (data.length < PAGE) return ids;
-  }
 }
 
 /** Turns a stored mistake into a trainable position. */
@@ -57,6 +46,8 @@ export interface PositionSelect {
   near?: number;
   /** Ids ("m123") already served in this session. */
   exclude?: Iterable<string>;
+  /** The user's trained mistake ids, if already loaded (saves reading them again). */
+  attempted?: Set<number>;
   random?: () => number;
 }
 
@@ -68,23 +59,20 @@ export async function selectPositions(db: Pick<Db, "from">, o: PositionSelect): 
   if (o.labelKeys.length === 0 || o.count <= 0) return [];
   const random = o.random ?? Math.random;
   const exclude = new Set(o.exclude ?? []);
-  const done = await attemptedMistakeIds(db, o.userId);
+  const done = o.attempted ?? await attemptedMistakeIds(db, o.userId);
 
-  const rows: MistakeRow[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await db.from("mistakes")
-      .select("id, fen, labels, accepted_moves, subtlety, played_san, played_uci, refutation, best_san, played_at")
-      .eq("user_id", o.userId).contains("labels", o.labelKeys).not("accepted_moves", "is", null)
-      .order("id").range(from, from + PAGE - 1);
-    if (error) {
-      if (/accepted_moves|subtlety/.test(error.message)) {
-        console.error("Positions aren't ready: apply migration 0006 and run the analysis workflow.");
-        return [];
-      }
-      throw new Error(`Could not read positions: ${error.message}`);
+  let rows: MistakeRow[];
+  try {
+    rows = await readAll<MistakeRow>((from, to) =>
+      db.from("mistakes").select(MISTAKE_COLUMNS)
+        .eq("user_id", o.userId).contains("labels", o.labelKeys).not("accepted_moves", "is", null)
+        .order("id").range(from, to), "read positions");
+  } catch (e) {
+    if (e instanceof Error && /accepted_moves|subtlety/.test(e.message)) {
+      console.error("Positions aren't ready: apply migration 0006 and run the analysis workflow.");
+      return [];
     }
-    rows.push(...(data as MistakeRow[]));
-    if (data.length < PAGE) break;
+    throw e;
   }
 
   const fresh = rows
