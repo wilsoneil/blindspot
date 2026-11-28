@@ -5,7 +5,9 @@ import { buildProfile, type Profile, type ProfileGame, type ProfileMistake } fro
 import { backfillDates, historyEntries, trendOf, type Trend } from "./progress/weakness-trend";
 import { puzzleScores, type PuzzleAttemptForScore } from "./analysis/puzzle-scores";
 import type { Db } from "./db";
+import { readAll } from "./read-all";
 import { describeTimeControl, type Settings } from "./settings";
+import { isFullySolved } from "./training/rating";
 
 /** Time classes the analysis covers: blitz for the main profile, daily for the secondary one (SPEC.md). */
 export const ANALYSED_TIME_CLASSES = ["blitz", "daily"];
@@ -31,20 +33,6 @@ export function historyStart(months: number | null, now: Date): Date | null {
   const d = new Date(now);
   d.setUTCMonth(d.getUTCMonth() - months);
   return d;
-}
-
-const PAGE = 1000;
-
-/** Reads every row of a query, a page at a time (the API returns at most 1,000 rows per request). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function readAll<T>(query: (from: number, to: number) => PromiseLike<{ data: any[] | null; error: { message: string } | null }>): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await query(from, from + PAGE - 1);
-    if (error) throw new Error(error.message);
-    out.push(...(data as T[]));
-    if (!data || data.length < PAGE) return out;
-  }
 }
 
 interface GameRow {
@@ -76,7 +64,7 @@ interface AttemptRow {
 }
 
 const toScored = (r: AttemptRow): PuzzleAttemptForScore => ({
-  labels: r.labels, puzzleRating: r.puzzle_rating, fullySolved: r.correct && r.solve_ms <= r.target_ms, attemptedAt: r.attempted_at,
+  labels: r.labels, puzzleRating: r.puzzle_rating, fullySolved: isFullySolved(r), attemptedAt: r.attempted_at,
 });
 
 /** Everything a profile is built from: analysed games and mistakes per profile key, and puzzle results. */

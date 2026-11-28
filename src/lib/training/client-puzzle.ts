@@ -1,7 +1,8 @@
 // What the browser gets for each puzzle or position: what to show, and the target time.
 
 import type { Settings } from "../settings";
-import { targetTimeMs } from "./play";
+import { itemTargetMs } from "./play";
+import type { ReviewItem } from "./review";
 import type { PositionDetails, TrainingPuzzle } from "./select";
 
 export interface ClientPuzzle {
@@ -17,15 +18,14 @@ export interface ClientPuzzle {
 }
 
 /** Which record an attempt is saved against. */
-export function attemptRef(p: ClientPuzzle): { puzzleId: string } | { mistakeId: number } {
+export function attemptRef(p: ClientPuzzle): ReviewItem {
   return p.position ? { mistakeId: p.position.mistakeId } : { puzzleId: p.id };
 }
 
 export function clientPuzzle(p: TrainingPuzzle & { review?: boolean }, settings: Settings, level: number): ClientPuzzle {
-  // Own positions: one move, and no "well above your level" extra time (as the server decides).
-  const targetMs = p.position
-    ? targetTimeMs({ userMoves: 1, puzzleRating: level, level, setting: settings.targetTime })
-    : targetTimeMs({ userMoves: p.moves.length / 2, puzzleRating: p.rating, level, setting: settings.targetTime });
+  // Own positions: one move, and no rating of their own (as the server decides).
+  const targetMs = itemTargetMs(
+    p.position ? { userMoves: 1, rating: null } : { userMoves: p.moves.length / 2, rating: p.rating }, level, settings.targetTime);
   return {
     ...(p.review ? { review: true } : {}),
     ...(p.position ? { position: p.position } : {}),

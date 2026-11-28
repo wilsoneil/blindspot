@@ -9,7 +9,8 @@
 
 import { approxRating } from "../analysis/accepted";
 import type { Db } from "../db";
-import { expectedScore, PUZZLE_RD, rateAttempt, START, type Glicko } from "./rating";
+import { readAll } from "../read-all";
+import { expectedScore, isFullySolved, PUZZLE_SLOPE, rateAttempt, START, type Glicko } from "./rating";
 
 /** First attempts at own positions needed before the fitted rule replaces the fixed one. */
 export const MIN_CALIBRATION_ATTEMPTS = 100;
@@ -41,12 +42,8 @@ export function positionRating(level: number, subtlety: number | null, calibrati
   return calibration ? Math.round(calibration.a + calibration.b * s) : approxRating(level, s);
 }
 
-const SCALE = 173.7178;
-/** The slope of the expected score per rating point (Glicko-2, puzzle RD PUZZLE_RD). */
-const K = (() => {
-  const phi = PUZZLE_RD / SCALE;
-  return 1 / Math.sqrt(1 + (3 * phi * phi) / (Math.PI * Math.PI)) / SCALE;
-})();
+/** The slope of the expected score per rating point (Glicko-2, against a puzzle). */
+const K = PUZZLE_SLOPE;
 
 /**
  * Fits a and b by maximum likelihood (Newton's method), pulled gently towards the fixed rule
@@ -100,8 +97,6 @@ export function expectedSolved(attempts: PositionAttempt[], calibration: Positio
     / attempts.length;
 }
 
-const PAGE = 1000;
-
 interface AttemptRow {
   puzzle_id: string | null;
   puzzle_rating: number | null;
@@ -118,27 +113,24 @@ interface AttemptRow {
 export async function loadTrainingHistory(db: Pick<Db, "from">, userId: string): Promise<{
   rating: Glicko; positions: PositionAttempt[];
 }> {
+  const rows = await readAll<AttemptRow>((from, to) =>
+    db.from("puzzle_attempts")
+      .select("puzzle_id, puzzle_rating, correct, solve_ms, target_ms, mistakes(subtlety)")
+      .eq("user_id", userId).eq("first_attempt", true)
+      .order("id").range(from, to), "read attempts");
   let r = START;
   let puzzles = 0;
   const positions: PositionAttempt[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await db.from("puzzle_attempts")
-      .select("puzzle_id, puzzle_rating, correct, solve_ms, target_ms, mistakes(subtlety)")
-      .eq("user_id", userId).eq("first_attempt", true)
-      .order("id").range(from, from + PAGE - 1);
-    if (error) throw new Error(`Could not read attempts: ${error.message}`);
-    const rows = data as unknown as AttemptRow[];
-    for (const row of rows) {
-      const fullySolved = row.correct && row.solve_ms <= row.target_ms;
-      if (row.puzzle_id !== null && row.puzzle_rating !== null) {
-        r = rateAttempt(r, { puzzleRating: row.puzzle_rating, fullySolved });
-        puzzles++;
-      } else if (row.mistakes && puzzles >= MIN_PUZZLES_BEFORE) {
-        positions.push({ subtlety: row.mistakes.subtlety ?? 0.5, rating: r.rating, fullySolved });
-      }
+  for (const row of rows) {
+    const fullySolved = isFullySolved(row);
+    if (row.puzzle_id !== null && row.puzzle_rating !== null) {
+      r = rateAttempt(r, { puzzleRating: row.puzzle_rating, fullySolved });
+      puzzles++;
+    } else if (row.mistakes && puzzles >= MIN_PUZZLES_BEFORE) {
+      positions.push({ subtlety: row.mistakes.subtlety ?? 0.5, rating: r.rating, fullySolved });
     }
-    if (rows.length < PAGE) return { rating: r, positions };
   }
+  return { rating: r, positions };
 }
 
 /** The puzzle level and the own-position rule, for choosing what to train. */

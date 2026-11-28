@@ -52,7 +52,9 @@ export interface ItemSelect {
   calibration?: PositionCalibration | null;
   /** Aim at this rating instead of the level (the mixed modes' ladder). */
   near?: number;
+  /** The user's attempted puzzle ids and trained mistake ids, if already loaded. */
   attempted?: Set<string>;
+  attemptedMistakes?: Set<number>;
   exclude?: Iterable<string>;
   random?: () => number;
 }
@@ -74,6 +76,10 @@ export async function selectFor(db: Pick<Db, "from">, w: Weakness, o: ItemSelect
     }
     return out;
   }
+  const positionsFor = (labelKeys: string[], count: number, exclude: Iterable<string> | undefined) => selectPositions(db, {
+    userId: o.userId, labelKeys, count, level: o.level, calibration: o.calibration, near: o.near,
+    exclude, attempted: o.attemptedMistakes, random: o.random,
+  });
   if (w.kind === "puzzles") {
     const puzzlesFor = (count: number) => selectPuzzles(db, {
       userId: o.userId, puzzleLabels: w.puzzleLabels, count, level: Math.round(o.near ?? o.level),
@@ -81,24 +87,14 @@ export async function selectFor(db: Pick<Db, "from">, w: Weakness, o: ItemSelect
     });
     if (!w.ownLabelKeys) return puzzlesFor(o.count);
     // Half own positions (rounded up), the rest puzzles, alternating own / puzzle.
-    const own = await selectPositions(db, {
-      userId: o.userId, labelKeys: w.ownLabelKeys, count: Math.ceil(o.count / 2), level: o.level, calibration: o.calibration, near: o.near,
-      exclude: o.exclude, random: o.random,
-    });
+    const own = await positionsFor(w.ownLabelKeys, Math.ceil(o.count / 2), o.exclude);
     const puzzles = await puzzlesFor(o.count - own.length);
     // Too few puzzles: fill up with more own positions.
     const short = o.count - own.length - puzzles.length;
-    const more = short > 0
-      ? await selectPositions(db, {
-        userId: o.userId, labelKeys: w.ownLabelKeys, count: short, level: o.level, calibration: o.calibration, near: o.near,
-        exclude: [...(o.exclude ?? []), ...own.map((p) => p.id)], random: o.random,
-      })
-      : [];
+    const more = short > 0 ? await positionsFor(w.ownLabelKeys, short, [...(o.exclude ?? []), ...own.map((p) => p.id)]) : [];
     return [...alternate(own, puzzles), ...more];
   }
-  return selectPositions(db, {
-    userId: o.userId, labelKeys: w.labelKeys, count: o.count, level: o.level, calibration: o.calibration, near: o.near, exclude: o.exclude, random: o.random,
-  });
+  return positionsFor(w.labelKeys, o.count, o.exclude);
 }
 
 /** a[0], b[0], a[1], b[1], ... then whatever is left of the longer list. */

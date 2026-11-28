@@ -4,9 +4,10 @@
 // target time and whether this is the user's first attempt at the puzzle.
 
 import type { Db } from "../db";
+import { check } from "../read-all";
 import type { Settings } from "../settings";
-import { targetTimeMs } from "./play";
-import { updateReview, type ReviewChange } from "./review";
+import { itemTargetMs } from "./play";
+import { updateReview, type ReviewChange, type ReviewItem } from "./review";
 
 // ("blindspot" was a fourth mode until Nov 2026; the database still allows it for old rows.)
 export const MODES = ["drill", "rush", "survival"] as const;
@@ -47,10 +48,6 @@ export interface AttemptOutcome {
 
 export class AttemptError extends Error {}
 
-function check(error: { message: string } | null, what: string) {
-  if (error) throw new Error(`Could not ${what}: ${error.message}`);
-}
-
 /** Starts a training session. */
 export async function startSession(
   db: Pick<Db, "from">, userId: string, o: { mode: Mode; profileKey: string; weaknessKey?: string | null },
@@ -65,7 +62,10 @@ export async function startSession(
 /** What was attempted: its labels, rating (Lichess puzzles only) and moves to play. */
 type Item = { column: "puzzle_id" | "mistake_id"; id: string | number; labels: string[]; rating: number | null; userMoves: number };
 
+/** Checks the attempt data, then loads what was attempted. */
 async function loadItem(db: Pick<Db, "from">, userId: string, input: AttemptInput): Promise<Item> {
+  if (!MODES.includes(input.mode)) throw new AttemptError("Unknown training mode.");
+  if (!Number.isFinite(input.solveMs) || !Number.isFinite(input.wrongMoves)) throw new AttemptError("Bad attempt data.");
   if (typeof input.mistakeId === "number") {
     // The user's own position: it must be one of their mistakes.
     const { data, error } = await db.from("mistakes")
@@ -84,31 +84,32 @@ async function loadItem(db: Pick<Db, "from">, userId: string, input: AttemptInpu
   return { column: "puzzle_id", id: p.id, labels: p.labels, rating: p.rating, userMoves: p.moves.split(" ").filter(Boolean).length / 2 };
 }
 
+type SessionTally = { id: number; attempted: number; solved: number };
+
+/** The session with its tally so far, if it is the user's own. */
+async function ownSession(db: Pick<Db, "from">, userId: string, sessionId: number | null): Promise<SessionTally | null> {
+  if (sessionId === null) return null;
+  const { data, error } = await db.from("training_sessions")
+    .select("id, attempted, solved").eq("id", sessionId).eq("user_id", userId).maybeSingle();
+  check(error, "read the training session");
+  return data as SessionTally | null;
+}
+
 /**
  * Saves one attempt at a Lichess puzzle or one of the user's own positions, and updates its
  * session's tally and the review queue. Own positions never count towards the rating
- * (they have no puzzle rating), but are logged the same way.
+ * (they have no puzzle rating), but are logged the same way. `level` may be a promise, so
+ * the caller's rating read runs alongside the reads here.
  */
 export async function recordPuzzleAttempt(
-  db: Pick<Db, "from">, userId: string, settings: Settings, input: AttemptInput, level: number,
+  db: Pick<Db, "from">, userId: string, settings: Settings, input: AttemptInput, level: number | Promise<number>,
 ): Promise<AttemptOutcome> {
-  if (!MODES.includes(input.mode)) throw new AttemptError("Unknown training mode.");
-  if (!Number.isFinite(input.solveMs) || !Number.isFinite(input.wrongMoves)) throw new AttemptError("Bad attempt data.");
-
-  const p = await loadItem(db, userId, input);
-
+  const [p, own, lvl] = await Promise.all([loadItem(db, userId, input), ownSession(db, userId, input.sessionId), level]);
   // The session must be the user's own; otherwise start a new one.
-  let sessionId = input.sessionId;
-  if (sessionId !== null) {
-    const { data, error } = await db.from("training_sessions")
-      .select("id").eq("id", sessionId).eq("user_id", userId).maybeSingle();
-    check(error, "read the training session");
-    if (!data) sessionId = null;
-  }
-  sessionId ??= await startSession(db, userId, input);
+  const tally: SessionTally = own ?? { id: await startSession(db, userId, input), attempted: 0, solved: 0 };
+  const sessionId = tally.id;
 
-  // Own positions have no rating, so they never get the "well above your level" extra time.
-  const targetMs = targetTimeMs({ userMoves: p.userMoves, puzzleRating: p.rating ?? level, level, setting: settings.targetTime });
+  const targetMs = itemTargetMs(p, lvl, settings.targetTime);
   const solveMs = Math.min(MAX_SOLVE_MS, Math.max(0, Math.round(input.solveMs)));
   const retries = Math.max(0, Math.round(input.wrongMoves));
   const correct = input.solved && !input.revealed && retries === 0;
@@ -132,19 +133,13 @@ export async function recordPuzzleAttempt(
   }
   check(insertErr, "save the attempt");
 
-  const { data: s, error: sErr } = await db.from("training_sessions")
-    .select("attempted, solved").eq("id", sessionId).single();
-  check(sErr, "read the training session");
-  const session = {
-    attempted: (s as { attempted: number }).attempted + 1,
-    solved: (s as { solved: number }).solved + (fullySolved ? 1 : 0),
-  };
-  const { error: updErr } = await db.from("training_sessions")
-    .update({ ...session, ended_at: new Date().toISOString() }).eq("id", sessionId);
+  const session = { attempted: tally.attempted + 1, solved: tally.solved + (fullySolved ? 1 : 0) };
+  const item: ReviewItem = p.column === "puzzle_id" ? { puzzleId: p.id as string } : { mistakeId: p.id as number };
+  const [{ error: updErr }, review] = await Promise.all([
+    db.from("training_sessions").update({ ...session, ended_at: new Date().toISOString() }).eq("id", sessionId),
+    updateReview(db, userId, item, fullySolved),
+  ]);
   check(updErr, "update the training session");
-
-  const review = await updateReview(db, userId,
-    p.column === "puzzle_id" ? { puzzleId: p.id as string } : { mistakeId: p.id as number }, fullySolved);
 
   return { sessionId, firstAttempt, correct, fullySolved, targetMs, session, review };
 }

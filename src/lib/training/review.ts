@@ -7,6 +7,7 @@
 //     failing) don't move it, so the schedule can't be rushed.
 
 import type { Db } from "../db";
+import { check } from "../read-all";
 
 export const INTERVAL_DAYS = [1, 3, 7, 21];
 const DAY = 86_400_000;
@@ -28,10 +29,6 @@ export function nextReview(entry: { step: number; dueAt: Date } | null, fullySol
   if (entry.step >= INTERVAL_DAYS.length - 1) return { kind: "graduated" };
   const step = entry.step + 1;
   return { kind: "advanced", step, dueAt: new Date(now.getTime() + INTERVAL_DAYS[step] * DAY) };
-}
-
-function check(error: { message: string } | null, what: string) {
-  if (error) throw new Error(`Could not ${what}: ${error.message}`);
 }
 
 /** A Lichess puzzle or one of the user's own positions (a stored mistake). */
