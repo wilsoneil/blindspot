@@ -107,31 +107,6 @@ export function SettingsForm({ settings: s, timeControls }: { settings: Settings
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend>AI explanations <Coming phase={5} /></legend>
-        <div className="field">
-          <label className="toggle">
-            <input name="aiEnabled" type="checkbox" defaultChecked={s.aiEnabled} />
-            Allow AI explanations
-          </label>
-        </div>
-        <div className="field">
-          <label htmlFor="aiMonthlyBudgetGbp">Monthly budget (£)</label>
-          <input id="aiMonthlyBudgetGbp" name="aiMonthlyBudgetGbp" type="number" min={0} step="0.5" defaultValue={s.aiMonthlyBudgetGbp} />
-        </div>
-        <div className="field">
-          <label htmlFor="aiDailyLimit">Daily limit (explanations)</label>
-          <input id="aiDailyLimit" name="aiDailyLimit" type="number" min={0} defaultValue={s.aiDailyLimit} />
-        </div>
-        <div className="field">
-          <div className="label">Usage this month</div>
-          <div className="stats">
-            <div className="stat"><div className="stat-value">0</div><div className="stat-label">explanations</div></div>
-            <div className="stat"><div className="stat-value">£0.00</div><div className="stat-label">estimated spend</div></div>
-          </div>
-        </div>
-      </fieldset>
-
       <div className="save-bar">
         <button className="button" type="submit" disabled={saving}>{saving ? "Saving…" : "Save settings"}</button>
         {result && (

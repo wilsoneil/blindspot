@@ -9,7 +9,8 @@ A chess weakness trainer: it analyses the user's chess.com games, finds their we
 - Phase 2 (Analysis): done. Migration 0004 applied; 12-month backlog analysed (684 blitz games, 2,560 mistakes); the first real profile looks sensible (a mix of single labels and endgame pairs). Daily analysis runs after the import
 - Phase 3 (Training): done. Decisions in SPEC.md (target time, repetition schedule, accepted moves; Blindspot rating calculated from Phase 3, shown in Phase 4). Steps 1–12 done; migrations 0005 and 0006 applied, positions backlog filled (2,570), all games re-analysed with analysis version 2. Feedback rounds since: Blindspot mode dropped, Rush fixed at 5 minutes with 3 lives, run stats, "Your game" tag, allowed weaknesses mix own positions 1:1 with Lichess puzzles
 - Phase 4 (Progress): done. Blindspot rating and Blitz gap with charts, a rating and a games trend per weakness; migration 0007 applied, weakness history backfilled; home page simplified after feedback
-- Phase 5 (AI explanations): next. Costs money and needs an API key: agree the provider, model and budget with the user before any code (SPEC.md "Build phases")
+- Version 1 (phases 1–4): done
+- AI explanations (once Phase 5): optional, not planned (Nov 2026, the user's choice); the Settings fields were removed and the `ai_*` columns in `settings` are unused. If it is ever wanted, it costs money and needs an API key: agree the provider, model and budget with the user before any code (SPEC.md "Later (optional)")
 
 ### Phase 3 plan (one pull request per step)
 

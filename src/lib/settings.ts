@@ -16,9 +16,6 @@ export interface Settings {
   survivalLives: number;
   engineOnBoard: boolean;
   theme: ThemeId;
-  aiEnabled: boolean;
-  aiMonthlyBudgetGbp: number;
-  aiDailyLimit: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -32,9 +29,6 @@ export const DEFAULT_SETTINGS: Settings = {
   survivalLives: 3,
   engineOnBoard: false,
   theme: "slate",
-  aiEnabled: true,
-  aiMonthlyBudgetGbp: 5,
-  aiDailyLimit: 20,
 };
 
 export const HISTORY_OPTIONS: { value: number | null; label: string }[] = [
@@ -94,11 +88,6 @@ export function parseSettingsForm(form: FormData): Settings {
   const theme = String(form.get("theme"));
   if (!(THEME_IDS as readonly string[]).includes(theme)) throw new SettingsError("Unknown theme.");
 
-  const budget = Number(form.get("aiMonthlyBudgetGbp"));
-  if (!Number.isFinite(budget) || budget < 0 || budget > 1000) {
-    throw new SettingsError("AI monthly budget must be between £0 and £1,000.");
-  }
-
   return {
     chesscomUsername: username || null,
     focusTimeControl,
@@ -110,9 +99,6 @@ export function parseSettingsForm(form: FormData): Settings {
     survivalLives: int(form.get("survivalLives"), 1, 5, "Survival lives"),
     engineOnBoard: form.get("engineOnBoard") === "on",
     theme: theme as ThemeId,
-    aiEnabled: form.get("aiEnabled") === "on",
-    aiMonthlyBudgetGbp: Math.round(budget * 100) / 100,
-    aiDailyLimit: int(form.get("aiDailyLimit"), 0, 1000, "AI daily limit"),
   };
 }
 
@@ -132,9 +118,8 @@ export interface SettingsRow {
   survival_lives: number;
   engine_on_board: boolean;
   theme: string;
-  ai_enabled: boolean;
-  ai_monthly_budget_gbp: number | string; // Postgres numeric arrives as a string
-  ai_daily_limit: number;
+  // ai_enabled, ai_monthly_budget_gbp and ai_daily_limit (0001) are unused: AI explanations
+  // are optional, not part of version 1 (SPEC.md -> "Build phases and out of scope").
 }
 
 export function settingsFromRow(row: SettingsRow): Settings {
@@ -149,9 +134,6 @@ export function settingsFromRow(row: SettingsRow): Settings {
     survivalLives: row.survival_lives,
     engineOnBoard: row.engine_on_board,
     theme: (THEME_IDS as readonly string[]).includes(row.theme) ? (row.theme as ThemeId) : DEFAULT_SETTINGS.theme,
-    aiEnabled: row.ai_enabled,
-    aiMonthlyBudgetGbp: Number(row.ai_monthly_budget_gbp),
-    aiDailyLimit: row.ai_daily_limit,
   };
 }
 
@@ -167,8 +149,5 @@ export function settingsToRow(s: Settings): SettingsRow {
     survival_lives: s.survivalLives,
     engine_on_board: s.engineOnBoard,
     theme: s.theme,
-    ai_enabled: s.aiEnabled,
-    ai_monthly_budget_gbp: s.aiMonthlyBudgetGbp,
-    ai_daily_limit: s.aiDailyLimit,
   };
 }
