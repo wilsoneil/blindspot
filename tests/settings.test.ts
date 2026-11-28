@@ -13,9 +13,6 @@ function form(overrides: Record<string, string | null> = {}): FormData {
     survivalLives: "3",
     engineOnBoard: null,
     theme: "slate",
-    aiEnabled: "on",
-    aiMonthlyBudgetGbp: "5",
-    aiDailyLimit: "20",
     ...overrides,
   };
   const fd = new FormData();
@@ -43,7 +40,6 @@ describe("parseSettingsForm", () => {
     ["theme", "neon"],
     ["chesscomUsername", "bad name!"],
     ["focusTimeControl", "abc"],
-    ["aiMonthlyBudgetGbp", "-1"],
   ])("rejects %s = %s", (field, value) => {
     expect(() => parseSettingsForm(form({ [field]: value }))).toThrow();
   });
@@ -52,10 +48,6 @@ describe("parseSettingsForm", () => {
 describe("settings rows", () => {
   it("round-trips through the database format", () => {
     expect(settingsFromRow(settingsToRow(DEFAULT_SETTINGS))).toEqual(DEFAULT_SETTINGS);
-  });
-
-  it("reads Postgres numeric values that arrive as strings", () => {
-    expect(settingsFromRow({ ...settingsToRow(DEFAULT_SETTINGS), ai_monthly_budget_gbp: "7.50" }).aiMonthlyBudgetGbp).toBe(7.5);
   });
 });
 

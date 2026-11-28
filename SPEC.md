@@ -1,6 +1,6 @@
 # Blindspot — Chess Weakness Trainer Spec
 
-Last updated: 27 Nov 2026 (Blitz gap leads the home page; Blindspot rating moved to Settings)
+Last updated: 28 Nov 2026 (AI explanations made optional: version 1 is phases 1–4)
 
 > **For Claude Code:** this is the product spec for this repository. Build it phase by phase (see "Build phases"), finishing and testing each phase before starting the next. Ask before any step that creates accounts, costs money or needs secrets. Never put keys or passwords in code or commit them; they go in Vercel / GitHub / Supabase settings.
 
@@ -168,10 +168,6 @@ One settings page holds every adjustable choice; defaults are what the spec desc
 | Survival lives | 3 | 1–5 |
 | Engine on analysis board | Off | On / off |
 | Theme | Slate | Slate, Tournament, Paper |
-| AI explanations: monthly budget | £5 | Any amount; off |
-| AI explanations: daily limit | 20 | Any number |
-
-The AI usage panel (explanations and estimated spend this month) also sits on this page.
 
 ## Look and feel
 
@@ -204,12 +200,12 @@ GitHub repo ──(deploys on every change)──> Vercel (web app + server func
 - **Stack:** Next.js web app on Vercel; chessground board and chess.js rules; Stockfish (native in the job, WebAssembly in the browser); Supabase Postgres database
 - **Regions:** the Supabase database is in London (eu-west-2), so Vercel's server functions run in London too (`"regions": ["lhr1"]` in `vercel.json`). Each page makes several database calls; keeping both in the same city keeps each one short.
 - **Costs:** GitHub Actions is free and unlimited on a public repo, or 2,000 minutes a month on a private one. The 12-month backlog fits within one month. Vercel (Hobby, personal non-commercial) and Supabase free tiers cover one user. Supabase free projects pause after a week without database activity; the daily job keeps it active.
-- **Secrets:** the only API key is for the AI explanations (chess.com and Lichess are open); it sits in a Vercel server function with a spending cap. The database credentials and any future key live in Vercel and GitHub settings, never in code or chat. `.env` is ignored by Git from the first commit, and secret scanning is on.
+- **Secrets:** version 1 needs no API keys (chess.com and Lichess are open). The optional AI explanations would need one, kept in a Vercel server function with a spending cap. The database credentials and any future key live in Vercel and GitHub settings, never in code or chat. `.env` is ignored by Git from the first commit, and secret scanning is on.
 - **Personal game data:** chess.com game records contain the user's and opponents' usernames, so imported games, analysis results and ratings are stored only in Supabase. They are never committed to the repo: no real games in test fixtures, sample data, logs or exported files. Tests use made-up or anonymised games.
 
 ## Build phases and out of scope
 
-Version 1 is phases 1–5; nothing is trainable until the analysis runs.
+Version 1 is phases 1–4; nothing is trainable until the analysis runs. AI explanations, once planned as Phase 5, are optional and not part of version 1 (see "Later").
 
 **Phase 1A (warm-up, done):** a "hello world" page deployed from GitHub to Vercel
 
@@ -217,7 +213,8 @@ Version 1 is phases 1–5; nothing is trainable until the analysis runs.
 2. **Analysis:** Stockfish job, mistake tagging, weakness profiles; run the 12-month backlog. Milestone: the user can see their weakness profile from real games.
 3. **Training:** puzzle board, the four modes, attempt logging, analysis board with optional engine, positional "find the move" drills. The Blindspot rating is calculated from this phase, because rising difficulty and adaptive selection need it; it isn't shown until Phase 4.
 4. **Progress:** showing the Blindspot rating, Blitz gap, theme ratings, charts. (The daily import schedule was switched on early, in Phase 1.)
-5. **AI explanations:** an on-demand Explain button after a puzzle and on the analysis board. Stockfish and code establish the facts (the line, what is attacked, what the move fixes); the AI only puts them into words and never judges the position itself. Positional weaknesses first. Cost controls: prepaid provider credits with auto top-up off (hard cap); an in-app monthly budget and daily limit set in settings; a usage panel showing explanations and estimated spend this month; each position's explanation cached so repeats are free; a small, cheap model by default.
+
+**Later (optional): AI explanations,** dropped from version 1 in Nov 2026 and only to be built if wanted: an on-demand Explain button after a puzzle and on the analysis board. Stockfish and code establish the facts (the line, what is attacked, what the move fixes); the AI only puts them into words and never judges the position itself. Positional weaknesses first. Cost controls: prepaid provider credits with auto top-up off (hard cap); an in-app monthly budget and daily limit set in settings; a usage panel showing explanations and estimated spend this month; each position's explanation cached so repeats are free; a small, cheap model by default. Before any code, agree the provider, model and budget with the user; it needs an API key and costs money. The `settings` table still has unused `ai_enabled`, `ai_monthly_budget_gbp` and `ai_daily_limit` columns from migration 0001.
 
 **Later:** opening up to multiple users; mining unseen positional positions from Lichess games as a fairer test of positional training; possibly bringing back a choice of Rush length (3, 5 or 10 minutes), which needs a database change so each run records its length and the run stats compare like with like (the old `settings.rush_minutes` column is still there, unused).
 
